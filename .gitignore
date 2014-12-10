@@ -1,0 +1,8 @@
+
+# Magma
+*.sig
+*.dat
+
+# Testing (times)
+times/
+output/
