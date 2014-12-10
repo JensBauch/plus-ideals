@@ -11,6 +11,7 @@ p := t+1;
 q := t+4;
 f := x^6 + p*q^2*x^2 + p^2*q^3;
 
+
 K<a> := FunctionField(f);
 
 // Compute a triangular p-integral basis.
