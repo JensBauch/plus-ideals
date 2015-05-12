@@ -14,8 +14,8 @@
 
 declare verbose montestalk, 4;
 declare attributes FldNum: 
-pBasis, Discriminant, FactorizedDiscriminant, FactorizedPrimes, IntegralBasis,
-LocalIndex, PrimeIdeals, TreesIntervals;
+    pBasis, Discriminant, FactorizedDiscriminant, FactorizedPrimes, IntegralBasis,
+LocalIndex, IndexPrimeFactors, PrimeIdeals, TreesIntervals;
 			    
 IdealRecord:=recformat<
 Parent: FldNum,
@@ -3046,71 +3046,27 @@ end intrinsic;
 // Local bases
 
 
-intrinsic IdealBasis(I::Rec : HNF:=false, Separated:=false)->SeqEnum
-    { Compute a (Hermitian) basis of the ideal I. }
-
-	K:=I`Parent;
-    kt:=PolynomialRing(ConstantField(K));
-	tt:=Realtime();
-	
-    if not assigned K`FactorizedDiscriminant then
- 		d:=kt! Discriminant(DefiningPolynomial(K));   
-    	sq:=SquarefreeFactorization(d);
-		d:=kt!(d/&*[i[1]:i in sq]);
-
-    	K`FactorizedDiscriminant:=Factorization(d);
-    end if;
-
-    if not assigned K`Index then
-    	Index(K);
-    end if;
-
-    primes:=SetToSequence(Set(RationalRadical(I) cat K`Index));
-    if primes eq [] then
-    	return [K.1^i:i in [0..Degree(K)-1]],1;
-    end if;
-
-    basis, factor := SIdealBasis(I, primes : Alg:=Alg);
-
-    if HNF eq true then
-        basis := HermiteFormBasis(K, basis);
-    end if;
-
-    if Separated eq false then
-        return [ g*factor : g in basis];
-    else
-        return basis, factor;
-    end if;
-end intrinsic;
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-intrinsic pBasis(I::Rec, p::RngIntElt : HNF:=true, Separated:=false)->SeqEnum
-    { Computes a p-integral basis of the fractional ideal, optionally
-      in Hermite Form. }
+intrinsic pBasis(I::Rec, p::RngIntElt : HNF:=false, Separated:=false) -> SeqEnum
+    { Computes a p-integral basis of the fractional ideal }
       
-	K	:=	I`Parent;
-    if not assigned(K`PrimeIdeals) or not IsDefined(K`PrimeIdeals, p) then
-        Montes(K, p);
-    end if;
-
-    J, a := reduceIdeal(I, p);
-
-    B, nums, dexp := pIdealBasis(J, p);
+    nums, dexp, a := pBasisTriangular(I, p);
 
     if HNF eq true then
-        hnf_basis := HermiteFormBasis(I`Parent, p, nums, dexp);
+        basis := HermiteFormBasis(I`Parent, p, nums, dexp);
 
-        nums := [ Parent(nums[1])!Eltseq(Numerator(b)) : b in hnf_basis ];
-        B := hnf_basis;
+        nums := [ PolynomialRing(Integers())!Eltseq(Numerator(b)) : b in basis ];
+    else
+        K := I`Parent;
+        basis := Reverse([ (K![ Coefficient(nums[i], j)
+                            : j in [0..#nums-1] ])/K!p^dexp[i]
+                                : i in [#nums..1 by -1] ]);
     end if;
 
     if Separated eq false then
-        pa := Parent(B[1])!p^a;
-        return [ g*pa : g in B ];
+        pa := Rationals()!p^a;
+        return [ g*pa : g in basis ];
     else
-        return nums, dexp, a;
+        return nums, [ exp - a : exp in dexp ];
     end if;
 
 end intrinsic; // pBasis
@@ -3118,35 +3074,30 @@ end intrinsic; // pBasis
 intrinsic pBasis(K::FldNum, p::RngIntElt : HNF:=true, Separated:=false)->SeqEnum
     { Returns a p-basis of the maximal order. }
 
-    max_order := ideal(K, K!1);
-    Factorization(~max_order);
-
-    return pBasis(max_order, p : HNF:=HNF, Separated:=Separated);
+    return pBasis(ideal(K, K!1), p : HNF:=HNF, Separated:=Separated);
 end intrinsic; // pBasis
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
-intrinsic pIdealBasis(I::Rec, p::RngIntElt)-> SeqEnum
-    { Returns a p-basis of a fractional ideal}
-	
+intrinsic pBasisTriangular(I::Rec, p::RngIntElt) -> SeqEnum, SeqEnum, RngIntElt
+    { Computes a p-integral basis of the fractional ideal }
+      
 	K	:=	I`Parent;
+    Montes(K, p);
+    Factorization(~I);
 
-    exp:=[0:i in [1..#K`PrimeIdeals[p]]];
-	for i in I`Factorization do
-		if i[1] eq p then
-			exp[i[2]]:=i[3];
-		end if;
-	end for;
-	
-    // This allows us to only specify up to the highest indexed prime
-    // ideal with non-zero exponent.
-    basis, nums, dexp := MaxMin(K, p : exponents:=exp);
+    ideal_exp, a := reduceIdeal(I, p : exponents:=true);
 
-    return basis, nums, dexp;
-end intrinsic; // pIdealBasis
+    basis, nums, dexp := MaxMin(K, p, ideal_exp);
 
-intrinsic reduceIdeal(I::Rec, p::RngIntElt)-> Rec, RngIntElt
+    return nums, dexp, a;
+end intrinsic; // pBasisTriangular
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+intrinsic reduceIdeal(I::Rec, p::RngIntElt : exponents:=false)-> Rec, RngIntElt
     { Returns a new ideal J and exponent a such that I = p^a J. }
 
     Primes := I`Parent`PrimeIdeals[p];
@@ -3173,7 +3124,11 @@ intrinsic reduceIdeal(I::Rec, p::RngIntElt)-> Rec, RngIntElt
 
     J := &*[ I`Parent`PrimeIdeals[p,i]^Expos[i] : i in [1..s] ];
 
-    return J, a;
+    if exponents eq true then
+        return Expos, a;
+    else
+        return J, a;
+    end if;
 end intrinsic; // reduceIdeal
 
 
@@ -3181,27 +3136,38 @@ end intrinsic; // reduceIdeal
 ////////////////////////////////////////////////////////////////////////////////
 // Global bases
 
+intrinsic IndexPrimeFactors(K::FldNum)
+    {}
+
+    if assigned K`IndexPrimeFactors then
+        return;
+    end if;
+
+    if not assigned K`FactorizedDiscriminant then
+        K`FactorizedDiscriminant := Factorization(Discriminant(DefiningPolynomial(K)));
+    end if;
+
+    primes := [ f[1] : f in K`FactorizedDiscriminant | f[2] gt 1 ];
+    list := [ ];
+    for p in primes do
+        Montes(K, p);
+        if K`LocalIndex[p] gt 0 then
+            Append(~list, p);
+        end if;
+    end for;
+
+    K`IndexPrimeFactors := list;
+
+end intrinsic; // IndexPrimeFactors
+
 
 intrinsic IdealBasis(I::Rec : HNF:=false, Separated:=false)->SeqEnum
     { Compute a (Hermitian) basis of the ideal I. }
 
 	K:=I`Parent;
-    kt:=PolynomialRing(ConstantField(K));
-	tt:=Realtime();
-	
-    if not assigned K`FactorizedDiscriminant then
- 		d:=kt! Discriminant(DefiningPolynomial(K));   
-    	sq:=SquarefreeFactorization(d);
-		d:=kt!(d/&*[i[1]:i in sq]);
-
-    	K`FactorizedDiscriminant:=Factorization(d);
-    end if;
-
-    if not assigned K`Index then
-    	Index(K);
-    end if;
-
-    primes:=SetToSequence(Set(RationalRadical(I) cat K`Index));
+    IndexPrimeFactors(K);
+    
+    primes := SetToSequence(Set(RationalRadical(I) cat K`IndexPrimeFactors));
     if primes eq [] then
     	return [K.1^i:i in [0..Degree(K)-1]],1;
     end if;
@@ -3225,35 +3191,31 @@ intrinsic SIdealBasis(I::Rec, primelist::SeqEnum)-> SeqEnum
     K := I`Parent;
     Factorization(~I);
     n := Degree(K);
-    kt := Parent(primelist[1]);
     Numlist := [];
     Denlist := [];
     DenCRTlist := [];
     factor := 1;
 
-    for i in [1..#primelist] do
-        p := primelist[i];
+    for p in primelist do
 
-		Montes(K, p);
+        Montes(K, p);
 
-        if K`LocalIndex[p] gt 0 then
-            nums, dexp, pexp := pBasis(I, p : Separated:=true);
-            factor *:= K!p^pexp;
+        nums, dexp, pexp := pBasisTriangular(I, p);
+        factor *:= K!p^pexp;
 
-            dens := [ BaseField(K)!p^e : e in dexp ];
-            p_factors := [ fac : fac in I`Factorization | fac[1] eq p ];
-            if #p_factors gt 0 then
-                alpha := Maximum([ Ceiling(fac[3]/K`PrimeIdeals[p,fac[2]]`e)
-                                                : fac in p_factors ]);
-            else
-                alpha := 0;
-            end if;
-            dens_crt := [ p^(Maximum(alpha, 0)+Maximum(e+1, 0)) : e in dexp ];
-
-            Append(~Numlist, [ Coefficients(g) : g in nums ]);
-            Append(~Denlist, dens);
-            Append(~DenCRTlist, dens_crt);
+        dens := [ Rationals()!p^e : e in dexp ];
+        p_factors := [ fac : fac in I`Factorization | fac[1] eq p ];
+        if #p_factors gt 0 then
+            alpha := Maximum([ Ceiling(fac[3]/K`PrimeIdeals[p,fac[2]]`e)
+                                            : fac in p_factors ]);
+        else
+            alpha := 0;
         end if;
+        dens_crt := [ p^(Maximum(alpha, 0)+Maximum(e+1, 0)) : e in dexp ];
+
+        Append(~Numlist, [ Coefficients(g) : g in nums ]);
+        Append(~Denlist, dens);
+        Append(~DenCRTlist, dens_crt);
     end for;
 
     nprimes := #Denlist;
@@ -3383,7 +3345,7 @@ intrinsic MaxMinCore(okbasis_values::SeqEnum, modifiers::SeqEnum)-> SeqEnum, Seq
 end intrinsic; // MaxMinCore
 
 
-intrinsic MaxMin(K::FldNum, p::RngIntElt : exponents:=false)-> SeqEnum, SeqEnum, SeqEnum
+intrinsic MaxMin(K::FldNum, p::RngIntElt, exponents)-> SeqEnum, SeqEnum, SeqEnum
     { }
 
     maxmin_time := Cputime();
@@ -3397,16 +3359,9 @@ intrinsic MaxMin(K::FldNum, p::RngIntElt : exponents:=false)-> SeqEnum, SeqEnum,
     for i := 1 to s do
         Append(~bases_indices, calculateBasisIndices(K`PrimeIdeals[p,i]));
     end for;
-    bases_values := computeBasesValues(bases_indices, ok_frames);
 
-    if Type(exponents) eq BoolElt and exponents eq false then
-        modifiers := [ 0 : i in [1..s] ];
-        maximal_order := true;
-    else
-        modifiers := [ exponents[i]/K`PrimeIdeals[p,i]`e : i in [1..s] ];
-        maximal_order := false;
-    end if;
-            
+    bases_values := computeBasesValues(bases_indices, ok_frames);
+    modifiers := [ exponents[i]/K`PrimeIdeals[p,i]`e : i in [1..s] ];
 
     // Call MaxMin Core.
     indices, den_exp, values, req_approx_values := MaxMinCore(bases_values,
