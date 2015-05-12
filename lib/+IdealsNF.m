@@ -7,7 +7,7 @@
 //    Distributed under the terms of the GNU General Public License 
 //    http://www.gnu.org/licenses/gpl.txt  
 /////////////////////////////////////////////////////////////////////////////////////////
-//    Routines Inversionloop, pFactors, Cancel, SFL and SFLInitialize 
+//    Routines Inversionloop, pAdicFactors, Cancel, SFL and SFLInitialize 
 //    in collaboration with S. Pauli
 /////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -15,7 +15,7 @@
 declare verbose montestalk, 4;
 declare attributes FldNum: 
 pBasis, Discriminant, FactorizedDiscriminant, FactorizedPrimes, IntegralBasis,
-LocalIndex, pHermiteBasis, PrimeIdeals, TreesIntervals, Times, SFLCount;
+LocalIndex, PrimeIdeals, TreesIntervals;
 			    
 IdealRecord:=recformat<
 Parent: FldNum,
@@ -33,7 +33,9 @@ f: Integers(),              /* only for prime ideals */
 exponent: RngIntElt,        /* only for prime ideals */
 LocalGenerator: FldNumElt,  /* only for prime ideals */
 LogLG: ModTupRngElt,        /* only for prime ideals */
-CrossedValues: SeqEnum      /* only for prime ideals */
+CrossValues: SeqEnum,      /* only for prime ideals */
+Phiadic: List,       /* only for prime ideals */
+sfl: SeqEnum            /* only for prime ideals */
 >;
 
 TypeLevel:=recformat<
@@ -53,18 +55,10 @@ z: FldFinElt,
 omega: Integers(),
 cuttingslope: Integers(),
 Refinements: List, 
-alpha: Integers(),
 logPi: ModTupRngElt,
 logPhi: ModTupRngElt,
-logGamma: ModTupRngElt,
-Prime : Integers(),     /* only in level 1 */
-Pol : RngUPolElt,       /* only in level 1 */
-ProdQuots: SeqEnum,     /* only in level 1 */
-ProdQuotsVals: SeqEnum, /* only in level 1 */
-Phiadic: List,       /* only in level 1 */
-sfl: SeqEnum            /* only in level 1 */
+logGamma: ModTupRngElt
 >;
-
 
 OkutsuFrameLevel := recformat<
     degree: RngIntElt,
@@ -139,7 +133,7 @@ end intrinsic;
 /////////////////////////////////////////////////////////////////////////////////////
 
 
-intrinsic Construct(i,~type,respol,s,u,~Ppol)
+intrinsic Construct(i,~type,p,respol,point,~Ppol)
 {This routine constructs a polynomial Ppol with integer coefficients such that: 
 deg Ppol<m_i+1 and y^nu*R_i(Ppol)(y)=respol(y), where nu=ord_y(respol).
 The non-negative integers s,u are the coordinates of the left endpoint of a segment of slope -type[i]`slope supporting N_i(Ppol).
@@ -147,6 +141,8 @@ The non-negative integers s,u are the coordinates of the left endpoint of a segm
 
 require i le #type: "the first input is too large";
 require Degree(respol) lt type[i]`f: "the degree of the 3rd argument is too large"; 
+s:=point[1];
+u:=point[2];
 require u+s*type[i]`slope ge type[i]`f*(type[i]`e*type[i]`V+type[i]`h): "the point (s,u) is too low";
 var:=type[i]`Phi^type[i]`e;
 Ppol:=0;
@@ -154,7 +150,7 @@ if i eq 1 then
     height:=u-Degree(respol)*type[i]`h;
     for a in Reverse(Coefficients(respol)) do
 	lift:=PolynomialRing(Integers())!Eltseq(a,PrimeField(type[1]`Fq)); 
-	Ppol:=Ppol*var+lift*type[1]`Prime^height;
+	Ppol:=Ppol*var+lift*p^height;
 	height:=height+type[1]`h;
     end for; 
 else	
@@ -167,7 +163,7 @@ else
 	    txp,sa:=Quotrem(type[im1]`invh*newV,type[im1]`e);
 	    ua:=(newV-sa*type[im1]`h) div type[im1]`e; 
 	    newrespol:=type[im1]`FqY!Eltseq(a*type[i]`z^txp,type[im1]`Fq);
-	    Construct(im1,~type,newrespol,sa,ua,~Pj);
+	    Construct(im1,~type,p,newrespol,[sa,ua],~Pj);
 	end if;
 	Ppol:=Ppol*var+Pj;
 	newV:=newV+step;
@@ -180,7 +176,7 @@ end intrinsic;
 //////////////////////////////////////////////////////////////////////////
 
 intrinsic ConvertLogs(~type,log,~class)
-{The class mod P of the product of p^log[1]�Phi_1^log[2]���Phi_i^log[i+1], where P 
+{The class mod P of the product of p^log[1]Phi_1^log[2] ... Phi_i^log[i+1], where P 
 is the prime ideal given by type.
 }
 
@@ -199,8 +195,8 @@ end intrinsic;
 ///////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////
 
-intrinsic CrossedValues(~K,p)
-{Compute the values of the attribue P`CrossedValues for all prime ideals P 
+intrinsic CrossValues(~K,p)
+{Compute the values of the attribue P`CrossValues for all prime ideals P 
 in K`PrimeIdeals[p].}
 
 for tree in K`TreesIntervals[p] do
@@ -212,7 +208,7 @@ for tree in K`TreesIntervals[p] do
 	for k:=j+1 to #tree do
 	    t2:=position+k;
 	    inc:=0;
-	    IndexOfCoincidence(~K`PrimeIdeals[p,t1]`Type,~K`PrimeIdeals[p,t2]`Type,~inc);
+	    IndexOfCoincidence(~K`PrimeIdeals[p,t1]`Type,~K`PrimeIdeals[p,t2]`Type,~inc,p);
 	    Ref1:=Append(K`PrimeIdeals[p,t1]`Type[inc]`Refinements,[* K`PrimeIdeals[p,t1]`Type[inc]`Phi,K`PrimeIdeals[p,t1]`Type[inc]`slope *]);
 	    Ref2:=Append(K`PrimeIdeals[p,t2]`Type[inc]`Refinements,[* K`PrimeIdeals[p,t2]`Type[inc]`Phi,K`PrimeIdeals[p,t2]`Type[inc]`slope *]);
 	    minlength:=Min(#Ref1,#Ref2);
@@ -227,7 +223,7 @@ for tree in K`TreesIntervals[p] do
 	end for;
     end for;
     for t in tree do
-	K`PrimeIdeals[p,t]`CrossedValues:=RowSequence(Mat)[t-position];
+	K`PrimeIdeals[p,t]`CrossValues:=RowSequence(Mat)[t-position];
     end for;
 end for;
 end intrinsic;
@@ -309,30 +305,33 @@ den:=Denominator(solution);
 module:=den*&*MaxMaxExps;
 num:=Eltseq(Numerator(solution),Integers());
 num:=PolynomialRing(Integers())![x mod module: x in num];
-solution:=Evaluate(num,K.1)/den;    
+//solution:=Evaluate(num,K.1)/den;    
+solution:=K!Eltseq(num)/den;    
 return solution;
 end intrinsic;
 
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////
 
-intrinsic Different(~type,~different)
+intrinsic Different(~P,~different)
 {Valuation of the different ideal of the local extension of Qp given 
-by the p-adically irreducible polynomial represented by the given type.}
-e:=type[#type]`prode;
+by the p-adically irreducible polynomial represented by the given prime ideal P.}
+e:=P`Type[#P`Type]`prode;
+
+p:=P`IntegerGenerator;
 mu:=0;
-if #type gt 1 then 
-    nu:=&+[type[j]`slope/type[j]`prode: j in [1..#type-1]];
-    mu:=(type[#type]`V/e)-nu;
+if #P`Type gt 1 then 
+    nu:=&+[P`Type[j]`slope/P`Type[j]`prode: j in [1..#P`Type-1]];
+    mu:=(P`Type[#P`Type]`V/e)-nu;
 end if;
-ve:=Valuation(e,type[1]`Prime);
+ve:=Valuation(e,p);
 rho:=0;
 if ve ne 0 then 
-    SFL(~type,e*ve);
+    SFL(~P,e*ve);
     val:=0;
     dev:=[* *];
-    der:=Derivative(type[#type]`Phi);
-    Value(#type,~type,~der,~dev,~val);
+    der:=Derivative(P`Type[#P`Type]`Phi);
+    Value(#P`Type,~P`Type,~der,p,~dev,~val);
     rho:=val-e*mu;
 end if;
 different:=e-1+rho;
@@ -410,7 +409,7 @@ end intrinsic;
 intrinsic Generators(K,p)
 {Compute the generators of the prime ideals in K above the rational prime p.}
 
-_, _ := Montes(K,p);
+Montes(K,p);
 if &and[assigned P`Generator: P in K`PrimeIdeals[p]] then
     return;
 end if;
@@ -419,12 +418,12 @@ if nprimes eq 1 then
     K`PrimeIdeals[p,1]`Generator:=K`PrimeIdeals[p,1]`LocalGenerator;
     return;
 end if;
-
 for tree in K`TreesIntervals[p] do
     pos:=tree[1];
     if #tree eq 1 and K`PrimeIdeals[p,pos]`e eq 1 then
 	level:=K`PrimeIdeals[p,pos]`Type[1];
-	gen:=Evaluate(level`Phi,K.1);
+//	gen:=Evaluate(level`Phi,K.1);
+	gen:=K!Eltseq(level`Phi);
 	if level`slope gt 1 then 
 	    gen+:=p;
 	end if;
@@ -456,7 +455,8 @@ for i in [1..nprimes] do
     numcoeffs:=[x mod p^val: x in Eltseq(numgen,Integers())];
     gcd:=GCD(numcoeffs);
     numcoeffs:=[x div gcd: x in numcoeffs];
-    gen:=Evaluate(PolynomialRing(Integers())!numcoeffs,K.1)/dengen;	
+//    gen:=Evaluate(PolynomialRing(Integers())!numcoeffs,K.1)/dengen;	
+    gen:=K!numcoeffs/dengen;	
     if gen eq 1 then 
 	gen:=K!p; 
     end if;
@@ -467,13 +467,12 @@ end intrinsic;
 /////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////
 
-intrinsic IndexOfCoincidence(~t1,~t2,~i)
+intrinsic IndexOfCoincidence(~t1,~t2,~i,p)
 { The index is 0 if t1,t2 belong to different trees. Otherwise, it is the least index such that the triplets 
 (t1[i]`Phi,t1[i]`slope,t1[i]`psi) and (t2[i]`Phi,t2[i]`slope,t2[i]`psi) are different.
 The types must correspond to different prime ideals.}
 
-require t1[1]`Prime eq t2[1]`Prime: "types attached to different prime numbers";
-if t1[1]`Phi mod t1[1]`Prime ne t2[1]`Phi mod t1[1]`Prime then 
+if t1[1]`Phi mod p ne t2[1]`Phi mod p then 
     i:=0;
 end if;
 i:=1;
@@ -513,11 +512,12 @@ intrinsic IndexOfCoincidence(t1::SeqEnum, t2::SeqEnum)-> RngIntElt
     return i;
 end intrinsic; // IndexOfCoincidence
 
-intrinsic IndexOfCoincidence2(~t1,~t2,~i)
+
+
+intrinsic IndexOfCoincidence2(~t1,~t2,~i,p)
 {the types must correspond to different prime ideals}
 
-require t1[1]`Prime eq t2[1]`Prime: "types attached to different prime numbers";
-if t1[1]`Phi mod t1[1]`Prime ne t2[1]`Phi mod t1[1]`Prime then 
+if t1[1]`Phi mod p ne t2[1]`Phi mod p then 
     i:=0;
 else
 
@@ -529,17 +529,35 @@ end if;
 
 end intrinsic;
 
+intrinsic IndexOfCoincidence(t1::Rec, t2::Rec)-> RngIntElt
+    { The index of coincidence of types t1 and t2. }
+
+    i := 0;
+    IndexOfCoincidence(~t1`Type, ~t2`Type, ~i, t1`IntegerGenerator);
+
+    return i;
+end intrinsic;
+
+intrinsic IndexOfCoincidence(t1::SeqEnum, t2::SeqEnum)-> RngIntElt
+    { }
+
+    i := 0;
+    IndexOfCoincidence(~t1, ~t2, ~i);
+
+    return i;
+end intrinsic;
+
 /////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////
 
-intrinsic InitialLevel(p,Pol,psi,power: BAS:=false)-> Rec
-{Initialize a typelevel record with the given data. 
+intrinsic InitialPrimeIdeal(Pol,p,psi,power)-> Rec
+{Initialize a prime IdealRecord with the given data. 
 psi is a monic irreducible factor of Pol modulo p and power=ord_psi(Pol mod p)}
 
 Zx:=PolynomialRing(Integers());
 level:=rec<TypeLevel| 
 Phi:=Zx!Coefficients(psi), V:=0, prode:=1, prodf:=Degree(psi), Fq:=ext<GF(p)|psi>,
-omega:=power, cuttingslope:=0, Refinements:=[**], logPi:=Vector([1,0]), logPhi:=Vector([0,1]), Prime:=p, Pol:=Pol, Phiadic:=[* 0,0,0,0,0 *], sfl:=[0,0,0,0]
+omega:=power, cuttingslope:=0, Refinements:=[**], logPi:=Vector([1,0]), logPhi:=Vector([0,1])
 >;
 if level`prodf gt 1 then  
     mmm,nnn:=HasAttribute(level`Fq,"PowerPrinting");
@@ -553,11 +571,10 @@ else
 end if;
 level`FqY:=PolynomialRing(level`Fq);
 AssignNames(~(level`FqY),["Y" cat IntegerToString(0)]);
-if BAS then 
-    level`ProdQuots:=[PolynomialRing(Integers()).1^k: k in [0..level`prodf-1]];
-    level`ProdQuotsVals:=[Rationals()!0:k in [1..level`prodf]];
-end if;
-return level;
+Primeid:=rec<IdealRecord|
+IntegerGenerator:=p, Type:=[level], Phiadic:=[* 0,0,0,0,0,0,0 *], sfl:=[0,0,0,0], exponent:=0
+>;
+return Primeid;
 end intrinsic;
 
 /////////////////////////////////////////////////////////////////////////////////////
@@ -597,10 +614,10 @@ end intrinsic;
 /////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 intrinsic IsIntegralM(alpha::FldNumElt)->BoolElt
-{True iff the algebraic number alpha is integral. It should be fasther than the Magma standard routine.}
+{True iff the algebraic number alpha is integral. It should be fasther than the Magma standard routine}
 primes:=PrimeDivisors(Denominator(alpha));
 for p in primes do
-    _, _ := Montes(Parent(alpha),p);
+    Montes(Parent(alpha),p);
     for P in Parent(alpha)`PrimeIdeals[p] do
     	if PValuation(alpha,P) lt 0 then
 	       return false;
@@ -613,31 +630,26 @@ end intrinsic;
 //////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////
 
-intrinsic LastLevel(Phiadic,~type,side,dev: Lastpsi:=true)
-{Technical routine for the final part of the Montes algorithm.
+intrinsic LastLevel(Phiadic,~omrep,slope,dev: Lastpsi:=false)
+{This routine is called when a prime ideal is detected in the Montes algorithm. If the slope at the last level of the coresponding type is finite, this routine attaches certain data at the last level 
 }
 
-ord:=#type;
-type[ord]`e:=1;
-if ord gt 1 then 
-    nur:=&+[type[j]`slope/type[j]`prode: j in [1..ord-1]]; 
-    type[1]`sfl[1]:=Floor((type[ord]`V/type[ord]`prode)-nur);
+r:=#omrep`Type;
+omrep`Type[r]`e:=1;
+if r gt 1 then 
+    nur:=&+[omrep`Type[j]`slope/omrep`Type[j]`prode: j in [1..r-1]]; 
+    omrep`exponent:=Floor((omrep`Type[r]`V/omrep`Type[r]`prode)-nur);
 end if;
-if side[2] eq 0 then
-    slope:=-side[1];
-    type[ord]`h:=Integers()!slope;
-    type[1]`Phiadic[1]:=Phiadic[1];
-    type[1]`Phiadic[2]:=Phiadic[2];
-    if Lastpsi then
-	psi:=0;
-	ResidualPolynomial(ord,~type,~dev,~psi);
-	type[ord]`psi:=psi/LeadingCoefficient(psi);
-	type[ord]`logGamma:=type[ord]`logPhi-type[ord]`h*type[ord]`logPi;
-    end if;
-else
-    slope:=Infinity();
+omrep`Type[r]`slope:=slope;
+omrep`Type[r]`h:=Integers()!slope;
+omrep`Phiadic[1]:=Phiadic[1];
+omrep`Phiadic[2]:=Phiadic[2];
+if Lastpsi then
+    psi:=0;
+    ResidualPolynomial(r,~omrep`Type,omrep`IntegerGenerator,~dev,~psi);
+    omrep`Type[r]`psi:=psi/LeadingCoefficient(psi);
+    omrep`Type[r]`logGamma:=omrep`Type[r]`logPhi-omrep`Type[r]`h*omrep`Type[r]`logPi;
 end if;
-type[ord]`slope:=slope;
 end intrinsic;
 
 ///////////////////////////////////////////////////////////////////////////////////
@@ -701,7 +713,8 @@ else
 	CompensateValue(~K,p,tree,expsTree,~Compensations[i]);
     end for;
     universe:=&*Compensations;
-    Betas:=[Evaluate(universe div x,K.1): x in Compensations];
+//    Betas:=[Evaluate(universe div x,K.1): x in Compensations];
+    Betas:=[K!Eltseq(universe div x): x in Compensations];
 end if;
 Multipliers:=[K!0: i in [1..nprimes]];
 for i:=1 to ntrees do
@@ -713,9 +726,9 @@ for i:=1 to ntrees do
 	    den:=Denominator(mult);
 	    mx:=Max([Ceiling(exponents[k]/K`PrimeIdeals[p,k]`e): k in [1..nprimes]]);
 	    module:=den*p^mx;
-	    num:=PolynomialRing(Integers())!Eltseq(Numerator(mult),Integers());
-	    mult:=Evaluate(num mod module,K.1)/den;    
-	    Multipliers[t]:=mult;
+	    num:=PolynomialRing(Integers())!Eltseq(Numerator(mult),Integers()) mod module;
+//	    mult:=Evaluate(num mod module,K.1)/den;    
+	    Multipliers[t]:=K!Eltseq(num)/den;
 	end if;
     end for;
 end for;
@@ -739,7 +752,7 @@ end intrinsic;
 ///////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////
 
-intrinsic LocalLift(~type,class,~numlift,~denlift)
+intrinsic LocalLift(~type,p,class,~numlift,~denlift)
 {class should belong to the residue class field  type[r]`Fq. 
 The output is a pair g,e such that g(theta)/p^e is a lift to a P-integral element in K
 and deg g(x)<n_P}
@@ -763,9 +776,9 @@ else
     elt:=type[i]`z^(type[i-1]`invh*H)*class*newclass^(-1);
     varphi:=type[i-1]`FqY!Eltseq(type[i]`Fq!elt,type[i-1]`Fq);
     lift:=0;
-    Construct(i-1,~type,varphi,0,H,~lift);
-    v1lift:=Min([Valuation(x,type[1]`Prime): x in Coefficients(lift)]);
-    numlift:=lift div type[1]`Prime^v1lift;
+    Construct(i-1,~type,p,varphi,[0,H],~lift);
+    v1lift:=Min([Valuation(x,p): x in Coefficients(lift)]);
+    numlift:=lift div p^v1lift;
     denlift:=expden-v1lift;
 end if;
 end intrinsic;
@@ -780,8 +793,9 @@ The output is a lift to a P-integral element in K}
 require IsPrimeIdeal(P): "Second argument should be a prime ideal";
 numlift:=0;
 denlift:=0;
-LocalLift(~P`Type,class,~numlift,~denlift);
-return  Evaluate(numlift,P`Parent.1)/P`IntegerGenerator^denlift;
+LocalLift(~P`Type,P`IntegerGenerator,class,~numlift,~denlift);
+// return  Evaluate(numlift,P`Parent.1)/P`IntegerGenerator^denlift;
+return P`Parent!Eltseq(numlift)/P`IntegerGenerator^denlift;
 end intrinsic;
 
 ///////////////////////////////////////////////////////////////////////////////////
@@ -793,7 +807,7 @@ intrinsic LocalLift(class,P,m)->FldNumElt
 require IsPrimeIdeal(P): "Second argument should be a prime ideal";
 require m gt 0: "the third argument must be positive";
 precision:=2*P`exponent+Ceiling(m/P`e);
-SFL(~P`Parent,~P,precision*P`e-P`Type[#P`Type]`V);
+SFL(~P,precision*P`e-P`Type[#P`Type]`V);
 Zp:=pAdicRing(P`IntegerGenerator,precision);
 Zpx:=PolynomialRing(Zp);
 phi:=Zpx!P`Type[#P`Type]`Phi;
@@ -806,7 +820,7 @@ num:=0;
 den:=0;
 //Horner's rule
 for i:=m to 1 by -1 do
-    LocalLift(~P`Type,class[i],~num,~den);
+    LocalLift(~P`Type,P`IntegerGenerator,class[i],~num,~den);
     lftnum,lftden:=Cancel((lftnum*LGnum) mod phi,lftden+LGden:QUO:=false);
     lftnum,lftden:=Cancel(lftnum*pi^den+Zpx!num*pi^lftden,lftden+den:QUO:=false);
 end for;
@@ -814,16 +828,159 @@ lftnum:=PolynomialRing(Integers())!lftnum;
 if P`exponent ne 0 then
     lftnum:=lftnum mod Integers()!(pi^(lftden+Ceiling(m/P`e)));
 end if;
-return Evaluate(lftnum,P`Parent.1)/Integers()!(pi^lftden);
+// return Evaluate(lftnum,P`Parent.1)/Integers()!(pi^lftden);
+return P`Parent!Eltseq(lftnum)/Integers()!(pi^lftden);
 end intrinsic;
 
 ///////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////
 
-// TIMINGS: Added output
-intrinsic Montes(K::FldNum,p::RngIntElt: Basis:=false)-> SeqEnum, SeqEnum
+intrinsic Montes(poly::RngUPolElt,p::RngIntElt: Numberfield:=false, Squarefree:=false) ->SeqEnum,SeqEnum, RngIntElt
+{There is a triple output: OMreps= list of OM representations of the p-adic irreducible factors of poly;
+TreesIntervals: list of intervals with the position of the first and last prime ideals in each disconnected tree of OM representations;
+totalindex= p-index of the input polynomial.
+The option Squarefree:=true enables the detection of a non-squarefree input poly.
+The option Numberfield:=true forces the computation of the psi polynomial at the last level of each type.
+}
+
+require IsPrime(p): "First argument must be a prime integer";
+require (CoefficientRing(poly) eq Integers() and IsMonic(poly)): "The polynomial must be monic and have integer coefficients";
+
+TreesIntervals:=[];
+position:=0;
+totalindex:=0;   
+OMreps:=[];
+Pol:=poly;
+mahler:=Infinity();
+if Squarefree then
+    n:=Degree(poly);
+    NormPol:=&+[Abs(x): x in Coefficients(poly)];
+    mahler:=Floor(n*Log(p,n)+(2*n-2)*Log(p,NormPol));
+end if;
+fa:=Factorization(PolynomialRing(GF(p))!Pol);
+for factor in fa do
+vprint montestalk,2: "Analyzing irreducible factor modulo p: ",factor[1];
+    Leaves:=[InitialPrimeIdeal(Pol,p,factor[1],factor[2])];
+    Montesloop(~Pol,~Leaves,~totalindex,mahler: NF:=Numberfield);
+    if Squarefree and totalindex gt mahler then 
+	print "The input polynomial is not separable";
+	return [], [], Infinity();
+    end if;
+    Append(~TreesIntervals,[position+1..position+#Leaves]);
+    position+:=#Leaves;
+    OMreps cat:=Leaves;  
+end for;
+return OMreps,TreesIntervals,totalindex;
+end intrinsic;
+
+/////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////
+
+intrinsic Montesloop(~Pol,~Leaves,~totalindex,mahler: NF:=false)
+{Main loop of the Montes algorithm. 
+The iteration stops as soon as totalindex is greater than the given mahler bound.}
+
+p:=Leaves[1]`IntegerGenerator;	
+Stack:=Leaves;
+Leaves:=[];
+while #Stack gt 0 and totalindex le mahler do	  
+    omrep:=Stack[#Stack];
+    Prune(~Stack);
+    r:=#omrep`Type;
+vprint montestalk,2:  "Analyzing type of order ",r;
+vprint montestalk,2:  "Phir=",omrep`Type[r]`Phi;
+    sides:=[];
+    devsEachSide:=[* *];
+    phiadic:=Taylor(Pol,omrep`Type[r]`Phi,omrep`Type[r]`omega);
+    Newton(r,~omrep`Type,~phiadic,p,~sides,~devsEachSide);
+vprint montestalk,3: "Sides of Newton polygon:",sides;
+    lengthN:=omrep`Type[r]`omega;
+    indexN:=-omrep`Type[r]`cuttingslope*(lengthN*(lengthN-1) div 2); 
+    firstabscissa:= sides[1,2];
+    if firstabscissa gt 1 then
+	print "The input polynomial is not separable";
+	totalindex:=Infinity(); 
+	return;
+    end if;
+    if lengthN eq 1 or firstabscissa eq 1 then
+vprint montestalk,2:  "Found a factor of depth  ",r-1;
+	if firstabscissa eq 1 then 
+	    Pol:=Pol div omrep`Type[r]`Phi;
+	    omrep`Type[r]`slope:=Infinity();
+	    if lengthN eq 1 then
+		sides:=[];
+	    else
+		indexN+:=Integers()!sides[1,3]-sides[#sides,5];
+	    end if;
+	else
+	    LastLevel(phiadic,~omrep,-sides[1,1],devsEachSide[1]: Lastpsi:=NF);
+	    sides:=[];
+	end if;
+	Append(~Leaves,omrep);
+    end if;
+    prevh:=0;	
+    for i:=#sides to 1 by -1 do  // GRAN FOR  COSTATS
+	side:=sides[i];
+vprint montestalk,2:  "Analyzing side ",side;        
+	h:=-Numerator(side[1]);
+	e:=Denominator(side[1]);
+	omrep`Type[r]`h:=h;
+	omrep`Type[r]`e:=e;
+	omrep`Type[r]`slope:=-side[1];
+	omrep`Type[r]`invh:=InverseMod(h,e);
+	lprime:=(1-omrep`Type[r]`invh*h) div e;
+	newPi:=Eltseq(omrep`Type[r]`invh*omrep`Type[r]`logPhi+lprime*omrep`Type[r]`logPi);
+	Append(~newPi,0);  
+	omrep`Type[r]`logGamma:=e*omrep`Type[r]`logPhi-h*omrep`Type[r]`logPi;
+   	Ei:=Integers()!(side[4]-side[2]);
+	Hi:=Integers()!(side[3]-side[5]);
+	indexN+:=Ei*prevh+((Ei*Hi-Ei-Hi+(Ei div e))div 2);
+	prevh+:=Hi;
+	respol:=0;
+	ResidualPolynomial(r,~omrep`Type,p,~devsEachSide[i],~respol);
+        respol:=respol/LeadingCoefficient(respol);
+	factors:=Factorization(respol);
+vprint montestalk,2: "Monic Residual Polynomial=",respol;
+vprint montestalk,3:  "Factors of R.P.:=",factors;         
+        for factor in factors do     
+vprint montestalk,2: "Analyzing factor of the Res.Pol.",factor[1];  
+            newom:=omrep;  
+            newom`Type[r]`psi:=factor[1];
+	    newom`Type[r]`f:=Degree(newom`Type[r]`psi);
+	    Representative(~newom`Type,p);
+// IF REFINA-AVANCA
+	    if Degree(newom`Type[r]`Phi) eq Degree(newom`Type[r+1]`Phi) then
+vprint montestalk,2:  "Refining. Cuttingslope=",-side[1];
+		if #sides gt 1 or #factors gt 1 then
+		    Append(~newom`Type[r]`Refinements,[*newom`Type[r]`Phi,newom`Type[r]`slope *]);
+		end if;
+		newom`Type[r]`cuttingslope:=-side[1];
+		newom`Type[r]`Phi:=newom`Type[r+1]`Phi;
+		newom`Type[r]`omega:=factor[2];
+		Prune(~newom`Type);  
+	    else
+vprint montestalk,2:  "Proceeding to higher order";    
+		newom`Type[r+1]`omega:=factor[2];
+		newom`Type[r+1]`logPi:=Vector(newPi);
+		vect:=-newom`Type[r+1]`V*newom`Type[r+1]`logPi;
+		vect[r+2]:=1;
+		newom`Type[r+1]`logPhi:=vect; 
+            end if; 
+// FINAL IF REFINA-AVANCA
+	    Append(~Stack,newom);
+        end for;     
+    end for; // FINAL GRAN FOR COSTATS
+    totalindex+:=omrep`Type[r]`prodf*indexN;
+vprint montestalk, 2: "Added  ",omrep`Type[r]`prodf*indexN," to the index";
+end while;
+end intrinsic;
+
+/////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////
+
+intrinsic Montes(K::FldNum,p::RngIntElt)
 {Apply the Montes algorithm to the number field K and the rational prime p. 
-The option Basis:=True forces the computation of a p-integral basis of K.}
+}
 require IsPrime(p): "First argument must be a prime integer";
 Pol:=DefiningPolynomial(K);
 require (CoefficientRing(Pol) eq Integers() and IsMonic(Pol)): "Number Field must be defined by a monic integral polynomial";
@@ -833,45 +990,28 @@ if not assigned K`FactorizedPrimes then
     K`PrimeIdeals:=AssociativeArray();
     K`LocalIndex:=AssociativeArray();
     K`TreesIntervals:=AssociativeArray();
-    K`pBasis:=AssociativeArray();
-    K`pHermiteBasis:=AssociativeArray();
-    K`Times := [ ];
-    K`SFLCount := 0;
 end if;    
-if p in K`FactorizedPrimes and (not Basis or IsDefined(K`pBasis,p)) then
-    // TIMINGS: Added output
-    return [], [];
+if p in K`FactorizedPrimes then
+    return;
 end if;
-totalindex:=0;   
-K`PrimeIdeals[p]:=[];
-TreesIntervals:=[];
-right:=0;
+K`PrimeIdeals[p],TreesIntervals,totalindex:=Montes(Pol,p: Numberfield:=true);
 Psi:=0;
 logLG:=0;
-BasisNums:=[];
-BasisDens:=[];
-primeid:=rec<IdealRecord|Parent:=K,IsPrime:=true,IsIntegral:=true,IntegerGenerator:=p>;
-fa:=Factorization(PolynomialRing(GF(p))!Pol);
-for factor in fa do
-    vprint montestalk,2: "Analyzing irreducible factor modulo p: ",factor[1];
-    level:=InitialLevel(p,Pol,factor[1],factor[2]: BAS:=Basis);
-    Leaves:=[];
-    Montesloop(level,~Leaves,~totalindex,~BasisNums,~BasisDens: Basisloop:=Basis);
-    Append(~TreesIntervals,[right+1..right+#Leaves]);  
-    for k:=1 to #Leaves do
-	primeid`Position:=right+k;
-	primeid`Factorization:=[[p,primeid`Position,1]];
-	primeid`FactorizationString:=FactorListToString(primeid`Factorization);
-	primeid`Type:=Leaves[k];
-	primeid`e:=primeid`Type[#primeid`Type]`prode;
-	primeid`f:=primeid`Type[#primeid`Type]`prodf; 
-	PrescribedValue(~primeid`Type,1,~Psi,~logLG);
-	primeid`LocalGenerator:=Evaluate(Psi,K.1)*p^logLG[1];
-	primeid`LogLG:=logLG;
-	primeid`exponent:=primeid`Type[1]`sfl[1];
-	Append(~K`PrimeIdeals[p],primeid); 
-    end for;
-    right+:=#Leaves;
+pos:=1;
+for i in [1..#K`PrimeIdeals[p]] do
+    K`PrimeIdeals[p,i]`Parent:=K;
+    K`PrimeIdeals[p,i]`IsPrime:=true;
+    K`PrimeIdeals[p,i]`IsIntegral:=true;
+    K`PrimeIdeals[p,i]`Position:=pos;
+    K`PrimeIdeals[p,i]`Factorization:=[[p,pos,1]];
+    pos+:=1;
+    K`PrimeIdeals[p,i]`FactorizationString:=FactorListToString(K`PrimeIdeals[p,i]`Factorization);
+    K`PrimeIdeals[p,i]`e:=K`PrimeIdeals[p,i]`Type[#K`PrimeIdeals[p,i]`Type]`prode;
+    K`PrimeIdeals[p,i]`f:=K`PrimeIdeals[p,i]`Type[#K`PrimeIdeals[p,i]`Type]`prodf; 
+    PrescribedValue(~K`PrimeIdeals[p,i]`Type,1,~Psi,~logLG);
+    K`PrimeIdeals[p,i]`LocalGenerator:=
+                K![ Coefficient(Psi, j) : j in [0..Degree(K)-1] ] * p^logLG[1];
+    K`PrimeIdeals[p,i]`LogLG:=logLG;
 end for;
 if #K`PrimeIdeals[p] eq 1 then
     K`PrimeIdeals[p,1]`Type[#K`PrimeIdeals[p,1]`Type]`Phi:=Pol;
@@ -881,234 +1021,12 @@ Append(~K`FactorizedPrimes,p);
 Sort(~K`FactorizedPrimes);
 K`LocalIndex[p]:=totalindex;
 K`TreesIntervals[p]:=TreesIntervals;
-CrossedValues(~K,p);
-if Basis then
-//ts:=Cputime();
-   BasisDexp := [ Floor(x) : x in BasisDens ];
-   BasisDens:=[p^x: x in BasisDexp];
-   BasisNums:=[BasisNums[j] mod (p*BasisDens[j]): j in [1..Degree(K)]];
-   for i:=1 to Degree(K) do
-	ct,BasisNums[i]:=Contpp(BasisNums[i]);
-	_,rest:=Valuation(ct,p);
-	BasisDens[i]:=BasisDens[i] div (ct div rest);
-    end for;
-    K`pBasis[p]:=[Evaluate(BasisNums[k],K.1)/BasisDens[k]: k in [1..Degree(K)]];
-    // TIMINGS: Added output
-    return BasisNums, BasisDexp;
-//print "simplification",Cputime(ts);
-else
-    // TIMINGS: Added output
-    return [], [];
-end if;
+CrossValues(~K,p);
 end intrinsic;
 
 /////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////
 
-intrinsic Montesloop(level,~Leaves,~totalindex,~BasisNums,~BasisDens: Basisloop:=false)
-{Perform the main loop of the Montes algorithm with the given data.}
-	
-Stack:=[[level]];
-while #Stack gt 0 do	  
-    type:=Stack[#Stack];
-    Prune(~Stack);
-    r:=#type;
-vprint montestalk,2:  "Analyzing type of order ",r;
-vprint montestalk,2:  "Phir=",type[r]`Phi;
-    Phiadic,Quotients:=Taylor(type[1]`Pol,type[r]`Phi,type[r]`omega);
-    sides:=[];
-    devsEachSide:=[* *];
-    Newton(r,~type,~Phiadic,~sides,~devsEachSide);
-    vprint montestalk,3: "Sides of Newton polygon:",sides;
-    lengthN:=type[r]`omega;
-    indexN:=-type[r]`cuttingslope*(lengthN*(lengthN-1) div 2); 
-    if lengthN eq 1 then
-	vprint montestalk,2:  "Found a factor of depth  ",r-1;
-	LastLevel(Phiadic,~type,sides[1],devsEachSide[1]);
-	Append(~Leaves,type);  
-	sides:=[];
-	if Basisloop and r eq 1 and type[1]`cuttingslope eq 0 then
-	    BasisNums cat:=[Quotients[1]*x: x in type[1]`ProdQuots];
-	    BasisDens cat:=type[1]`ProdQuotsVals;
-	end if;
-    end if;
-    prevh:=0;	
-    for i:=#sides to 1 by -1 do  // GRAN FOR SIDES
-	side:=sides[i];
-	vprint montestalk,2:  "Analyzing side ",side;        
-	type[r]`h:=-Numerator(side[1]);
-	type[r]`e:=Denominator(side[1]);
-	type[r]`slope:=-side[1];
-	type[r]`invh:=InverseMod(type[r]`h,type[r]`e);
-	lprime:=(1-type[r]`invh*type[r]`h) div type[r]`e;
-	newPi:=Eltseq(type[r]`invh*type[r]`logPhi+lprime*type[r]`logPi);
-	Append(~newPi,0);  
-	type[r]`logGamma:=type[r]`e*type[r]`logPhi-type[r]`h*type[r]`logPi;
-   	Ei:=Integers()!(side[4]-side[2]);
-	Hi:=Integers()!(side[3]-side[5]);
-	indexN+:=Ei*prevh+((Ei*Hi-Ei-Hi+(Ei div type[r]`e))div 2);
-	prevh+:=Hi;
-	respol:=0;
-	ResidualPolynomial(r,~type,~devsEachSide[i],~respol);
-        respol:=respol/LeadingCoefficient(respol);
-	factors:=Factorization(respol);
-//if terminal side we add a piece of basis
-	if Basisloop then
-	    lengthPQ:=#type[1]`ProdQuots;
-	    terminals:=[Degree(x[1]): x in factors|x[2] eq 1];
-	    nonterminals:=[Degree(x[1]): x in factors|x[2] ne 1];
-	    efS:=0;
-	    efrest:=0;
-	    if #terminals gt 0 then 
-		efS:=type[r]`e*&+terminals; 
-	    end if;
-	    if #nonterminals gt 0 then 
-		efrest:=type[r]`e*Max(nonterminals); 
-	    end if;
-	    efmax:=Max([efS,efrest]);
-	    step:=(type[r]`slope+type[r]`V)/type[r]`prode;
-	    height:=(side[5]-side[4]*type[r]`V)/type[r]`prode;
-	    lastabscissa:=Integers()!side[4];
-	    EnlargePQ:=[];
-	    EnlargePQVals:=[];
-	    for abscissa:=lastabscissa to lastabscissa-efmax+1 by -1 do
-		EnlargePQ cat:=[Quotients[abscissa]*x mod type[1]`Pol: x in type[1]`ProdQuots];
-		EnlargePQVals cat:=[height+x: x in type[1]`ProdQuotsVals];
-		height:=height+step;
-	    end for;
-	    if efS gt 0 then
-		BasisNums cat:=EnlargePQ[1..lengthPQ*efS];
-		BasisDens cat:=EnlargePQVals[1..lengthPQ*efS];              
-//		vprint montestalk,3: "Terminal side. Basis updated to ",BasisNums," with valuations ",BasisDens;                      
-	    end if;
-	end if;
-	vprint montestalk,2: "Monic Residual Polynomial=",respol;
-        vprint montestalk,3:  "Factors of R.P.:=",factors;            
-// PETIT FOR FACTORS	
-        for factor in factors do       
-	    vprint montestalk,2: "Analyzing factor of the Res.Pol.",factor[1];
-            ta:=type;  
-            ta[r]`psi:=factor[1];
-	    ta[r]`f:=Degree(ta[r]`psi);
-	    Representative(~ta);
-// IF REFINA-AVANCA
-	    if Degree(ta[r]`Phi) eq Degree(ta[r+1]`Phi) then
-		vprint montestalk,2:  "Refining. Cuttingslope=",-side[1];
-		if #sides gt 1 or #factors gt 1 then
-		    Append(~ta[r]`Refinements,[* ta[r]`Phi,ta[r]`slope *]);
-		end if;
-		ta[r]`cuttingslope:=-Integers()!side[1];
-		ta[r]`Phi:=ta[r+1]`Phi;
-		ta[r]`omega:=factor[2];
-		Prune(~ta);  
-	    else
-		vprint montestalk,2:  "Proceeding to higher order";    
-		ta[r+1]`omega:=factor[2];
-		ta[r+1]`logPi:=Vector(newPi);
-		vect:=-ta[r+1]`V*ta[r+1]`logPi;
-		vect[r+2]:=1;
-		ta[r+1]`logPhi:=vect; 
-		if Basisloop and factor[2] gt 1 then
-		    lef:=lengthPQ*ta[r]`e*ta[r]`f;
-		    ta[1]`ProdQuots cat:=EnlargePQ[lengthPQ+1..lef];	
-		    ta[1]`ProdQuotsVals cat:=EnlargePQVals[lengthPQ+1..lef];
-		end if;
-            end if; 
-// FINAL IF REFINA-AVANCA
-	    Append(~Stack,ta);
-        end for;     // FINAL PETIT FOR FACTORS
-    end for;         // FINAL GRAN FOR SIDES
-    totalindex+:=type[r]`prodf*indexN;
-    vprint montestalk, 2: "Added  ",type[r]`prodf*indexN," to the index";
-end while;
-end intrinsic;
-
-///////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////
-
-intrinsic MontesloopFactors(level,~Leaves,~totalindex,mahler)
-{Modified main loop of the Montes algorithm used in the factorization routines. 
-The iteration stops as soon as totalindex is greater than the given mahler bound.}
-	
-Stack:=[[level]];
-while #Stack gt 0 and totalindex le mahler do	  
-    type:=Stack[#Stack];
-    Prune(~Stack);
-    r:=#type;
-    Phiadic,Quotients:=Taylor(type[1]`Pol,type[r]`Phi,type[r]`omega);
-    if Phiadic[1] eq 0 and Phiadic[2] eq 0 then 
-	totalindex:=Infinity(); 
-	return; 
-    end if;
-    sides:=[];
-    devsEachSide:=[* *];
-    Newton(r,~type,~Phiadic,~sides,~devsEachSide);
-    lengthN:=type[r]`omega;
-    indexN:=-type[r]`cuttingslope*(lengthN*(lengthN-1) div 2); 
-    if lengthN eq 1 or Phiadic[1] eq 0 then
-	LastLevel(Phiadic,~type,sides[1],0: Lastpsi:=false);
-	Append(~Leaves,type);  
-    end if;
-    if Phiadic[1] eq 0 then
-	type[1]`Pol:=Quotients[1];
-	indexN+:=Integers()!sides[1,3]-sides[#sides,5];
-	for i in [1..#Stack] do
-	    Stack[i,1]`Pol:=Quotients[1];
-	end for;
-    end if;
-    if lengthN eq 1 then
-	sides:=[];
-    end if;
-    prevh:=0;	
-    for i:=#sides to 1 by -1 do  // GRAN FOR  COSTATS
-	side:=sides[i];
-	type[r]`h:=-Numerator(side[1]);
-	type[r]`e:=Denominator(side[1]);
-	type[r]`slope:=-side[1];
-	type[r]`invh:=InverseMod(type[r]`h,type[r]`e);
-	lprime:=(1-type[r]`invh*type[r]`h) div type[r]`e;
-	newPi:=Eltseq(type[r]`invh*type[r]`logPhi+lprime*type[r]`logPi);
-	Append(~newPi,0);  
-	type[r]`logGamma:=type[r]`e*type[r]`logPhi-type[r]`h*type[r]`logPi;
-   	Ei:=Integers()!(side[4]-side[2]);
-	Hi:=Integers()!(side[3]-side[5]);
-	indexN+:=Ei*prevh+((Ei*Hi-Ei-Hi+(Ei div type[r]`e))div 2);
-	prevh+:=Hi;
-	respol:=0;
-	ResidualPolynomial(r,~type,~devsEachSide[i],~respol);
-        respol:=respol/LeadingCoefficient(respol);
-	factors:=Factorization(respol);
-        for factor in factors do       
-            ta:=type;  
-            ta[r]`psi:=factor[1];
-	    ta[r]`f:=Degree(ta[r]`psi);
-	    Representative(~ta);
-// IF REFINA-AVANCA
-	    if Degree(ta[r]`Phi) eq Degree(ta[r+1]`Phi) then
-		if #sides gt 1 or #factors gt 1 then
-		    Append(~ta[r]`Refinements,[* ta[r]`Phi,ta[r]`slope *]);
-		end if;
-		ta[r]`cuttingslope:=-side[1];
-		ta[r]`Phi:=ta[r+1]`Phi;
-		ta[r]`omega:=factor[2];
-		Prune(~ta);  
-	    else
-		ta[r+1]`omega:=factor[2];
-		ta[r+1]`logPi:=Vector(newPi);
-		vect:=-ta[r+1]`V*ta[r+1]`logPi;
-		vect[r+2]:=1;
-		ta[r+1]`logPhi:=vect; 
-            end if; 
-// FINAL IF REFINA-AVANCA
-	    Append(~Stack,ta);
-        end for;     
-    end for; // FINAL GRAN FOR COSTATS
-    totalindex+:=type[r]`prodf*indexN;
-end while;
-end intrinsic;
-
-/////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////
 
 intrinsic Multiplier(~P,exponents,~mult)
 {Compute an element  mult in the number field Parent(P) which is congruent to 1 modulo P^a_P and it has Q-value >= a_Q.
@@ -1131,7 +1049,8 @@ for tree in Exclude(P`Parent`TreesIntervals[p],treeP) do
     CompensateValue(~P`Parent,p,tree,exps,~betatree);
     beta*:=betatree;
 end for;
-mult:=bp*Evaluate(beta,P`Parent.1);
+// mult:=bp*Evaluate(beta,P`Parent.1);
+mult:=bp*P`Parent!Eltseq(beta);
 MultiplyByInverse(~mult,~P,exponents[P`Position]);
 end intrinsic;
 
@@ -1168,7 +1087,8 @@ else
 	CompensateValue(~K,p,tree,expsTree,~Compensations[i]);
     end for;
     universe:=&*Compensations;
-    Betas:=[Evaluate(universe div x,K.1): x in Compensations];
+//    Betas:=[Evaluate(universe div x,K.1): x in Compensations];
+    Betas:=[K!Eltseq(universe div x): x in Compensations];
 end if;
 Multipliers:=[K!0: i in [1..nprimes]];
 for i:=1 to ntrees do
@@ -1179,7 +1099,8 @@ for i:=1 to ntrees do
 	den:=Denominator(mult);
 	module:=den*p^(extraden+Ceiling(mx));
 	num:=PolynomialRing(Integers())!Eltseq(Numerator(mult),Integers());
-	mult:=Evaluate(num mod module,K.1)/den;    
+//	mult:=Evaluate(num mod module,K.1)/den;    
+	mult:=K!Eltseq(num mod module)/den;    
 	Multipliers[t]:=mult;
     end for;
 end for;
@@ -1200,11 +1121,11 @@ require value eq 0: "the first argument is not invertible modulo the second argu
 p:=P`IntegerGenerator;
 xnum:=0;
 xden:=0;
-LocalLift(~P`Type,redalpha^(-1),~xnum,~xden);
+LocalLift(~P`Type,P`IntegerGenerator,redalpha^(-1),~xnum,~xden);
 //print "local lift",PValuation(1-alpha*Evaluate(xnum,P`Parent.1)/p^xden,P);
 alphaden:=Valuation(Denominator(alpha),p);
 precision:=Max([alphaden,2*P`exponent])+Ceiling(m/P`e);
-SFL(~P`Parent,~P,precision*P`e-P`Type[#P`Type]`V);
+SFL(~P,precision*P`e-P`Type[#P`Type]`V);
 Zp:=pAdicRing(p,precision);
 Zpx:=PolynomialRing(Zp);
 phi:=Zpx!P`Type[#P`Type]`Phi;
@@ -1217,7 +1138,8 @@ while h lt m do
     Inversionloop([*alphanum,alphaden*],~xnum,~xden,phi,lowprecision,Zp);
 //print "loop",PValuation(1-alpha*Evaluate(Zx!xnum,P`Parent.1)/p^xden,P);
 end while;  
-alpha*:=Evaluate(PolynomialRing(Integers())!xnum,P`Parent.1)/p^xden;
+//alpha*:=Evaluate(PolynomialRing(Integers())!xnum,P`Parent.1)/p^xden;
+alpha*:=P`Parent!xnum/p^xden;
 end intrinsic;
 
 //////////////////////////////////////////////////////////////////////////
@@ -1234,7 +1156,7 @@ if #tree eq 1 then
 end if;
 p:=P`IntegerGenerator;
 j:=P`Position-tree[1]+1;
-N:=&+[Numerator(P`Parent`PrimeIdeals[p,k]`CrossedValues[j]): k in tree];
+N:=&+[Numerator(P`Parent`PrimeIdeals[p,k]`CrossValues[j]): k in tree];
 ExcludeP:=Exclude(tree,P`Position);
 for t in ExcludeP do
     k:=t-tree[1]+1;
@@ -1242,18 +1164,19 @@ for t in ExcludeP do
     if #outPt eq 0 then
 	wPkAllPhis:=0;
     else
-	wPkAllPhis:=&+[Denominator(P`Parent`PrimeIdeals[p,l]`CrossedValues[j])*P`Parent`PrimeIdeals[p,l]`CrossedValues[k]: l in outPt];
+	wPkAllPhis:=&+[Denominator(P`Parent`PrimeIdeals[p,l]`CrossValues[j])*P`Parent`PrimeIdeals[p,l]`CrossValues[k]: l in outPt];
     end if;
     e:=P`Parent`PrimeIdeals[p,t]`e;
     ord:=#P`Parent`PrimeIdeals[p,t]`Type;
     V:=P`Parent`PrimeIdeals[p,t]`Type[ord]`V;
-    CVPk:=P`Parent`PrimeIdeals[p,t]`CrossedValues;
+    CVPk:=P`Parent`PrimeIdeals[p,t]`CrossValues;
     den:=Denominator(CVPk[j]);
     wPk:=((expsTree[k]/e)+N-wPkAllPhis)/den;
-    SFL(~P`Parent,~P`Parent`PrimeIdeals[p,t],Ceiling(wPk*e)-V);
+    SFL(~P`Parent`PrimeIdeals[p,t],Ceiling(wPk*e)-V);
     M:=Max([1+Floor(Max(CVPk)),Ceiling(wPk)]);
     phi:=P`Parent`PrimeIdeals[p,t]`Type[ord]`Phi mod p^M;
-    bp*:=Evaluate(phi^den,P`Parent.1);
+//    bp*:=Evaluate(phi^den,P`Parent.1);
+    bp*:=P`Parent!Eltseq(phi^den);
 end for;
 bp*:=p^(-N);
 end intrinsic;
@@ -1261,7 +1184,7 @@ end intrinsic;
 /////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////
 
-intrinsic Newton(i,~type,~phiadic,~sides,~devsEachSide)
+intrinsic Newton(i,~type,~phiadic,p,~sides,~devsEachSide)
 {Given a type of order at least i, and the phiadic expansion of a polynomial, compute:
   - sides=list of sides of the r-th order Newton polygon w.r.t. the type;
   - devsEachSide[k]=list of multiadic phi_1,...,phi_i-1 expansion of the coefficients of 
@@ -1280,7 +1203,7 @@ end if;
 val:=0;
 dev:=[* *];
 for k in [1..#phiadic] do 
-        Value(i,~type,~phiadic[k],~dev,~val);
+        Value(i,~type,~phiadic[k],p,~dev,~val);
         if IsFinite(val) then 
 	    Append(~cloud,<k-1,val+n>);  
 	    Append(~alldevs,dev);
@@ -1331,7 +1254,7 @@ end intrinsic;
 /////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////
 
-intrinsic pDiscriminant(p::RngIntElt, polynomial::RngUPolElt)-> RngIntElt,RngIntElt 
+intrinsic pDiscriminant(polynomial::RngUPolElt,p::RngIntElt)-> RngIntElt,RngIntElt 
 {Compute:
  -pdiscK: sum of the p-adic valuations of the discriminants of all local 
   extensions of Q_p, given by the irreducible p-adic factors of the given polynomial.
@@ -1342,14 +1265,14 @@ Note that the discriminant itself is not computed.
 require IsPrime(p): "First argument must be a prime integer";
 require (CoefficientRing(polynomial) eq Integers() and IsMonic(polynomial)): "The polynomial must be monic and integral";
 
-pls,OMReps,totalindex:=pFactors(p,polynomial,0);
+pls,OMReps,totalindex:=pAdicFactors(p,polynomial,0);
 if totalindex eq Infinity() then 
     return Infinity(),Infinity(); 
 end if;
 disc:=0;
 difft:=0;
 for i:=1 to #OMReps do
-    Different(~OMReps[i],~difft);
+    Different(~OMReps[i],p,~difft);
     disc+:=OMReps[i][#OMReps[i]]`prodf*difft;
 end for;
 return disc, disc+2*totalindex;
@@ -1358,45 +1281,23 @@ end intrinsic;
 ///////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
-intrinsic pFactors(p::RngIntElt,polynomial::RngUPolElt,prec::RngIntElt)->SeqEnum, SeqEnum, RngIntElt
-{Compute:
-- list: a list of Okutsu approximations to the irreducible p-adic factors of the given polynomial, 
-        all of them correct modulo p^precision.
-- OMReps: a list of OM representations of the irreducible factors of polynomial.
--totalindex: p-index of polynomial.
+intrinsic pAdicFactors(polynomial::RngUPolElt,p::RngIntElt,prec::RngIntElt: SQF:=false)->SeqEnum
+{Computes a list of Okutsu approximations to the irreducible p-adic factors of the given polynomial, all of them correct modulo p^precision.
+If SQF:=true the routine checks that the input polynomial is squarefree
 }
 require IsPrime(p): "First argument must be a prime integer";
 require (CoefficientRing(polynomial) eq Integers() and IsMonic(polynomial)): "The polynomial must be monic and integral";
 
-n:=Degree(polynomial);
-NormPol:=&+[Abs(x): x in Coefficients(polynomial)];
-mahler:=Floor(n*Log(p,n)+(2*n-2)*Log(p,NormPol));
-fa:=Factorization(PolynomialRing(GF(p))!polynomial);
-totalindex:=0;   
-OMReps:=[];
-pol:=polynomial;
-for factor in fa do
-    level:=InitialLevel(p,pol,factor[1],factor[2]);
-    Leaves:=[];
-    MontesloopFactors(level,~Leaves,~totalindex,mahler);
-    //require totalindex le mahler: "the input polynomial must be separable"; 
-    if totalindex gt mahler then 
-	    print "The input polynomial in pFactors is not separable, returning empty list of factors";
-        return [],[],Infinity();
-    end if;
-    pol:=Leaves[#Leaves,1]`Pol;    
-    OMReps cat:=Leaves;  
-end for;
-if #OMReps eq 1 then
-    OMReps[1,#OMReps[1]]`Phi:=polynomial;
-    OMReps[1,#OMReps[1]]`slope:=Infinity();
+OMreps,_,_:=Montes(polynomial,p: Squarefree:=SQF);
+if #OMreps eq 1 then
+    return[polynomial];
 end if;
-for i:=1 to #OMReps do
-    ord:=#OMReps[i];
-    slope:=OMReps[i,ord]`prode*(prec+OMReps[i,1]`sfl[1]+1)-OMReps[i,ord]`V;
-    SFL(~OMReps[i],slope);
+for i:=1 to #OMreps do
+    ord:=#OMreps[i]`Type;
+    slope:=OMreps[i]`Type[ord]`prode*(prec+OMreps[i]`exponent+1)-OMreps[i]`Type[ord]`V;
+    SFL(~OMreps[i],slope,polynomial);
 end for;
-return [T[#T]`Phi: T in OMReps], OMReps, totalindex;
+return [T`Type[#T`Type]`Phi: T in OMreps];
 end intrinsic;
 
 ///////////////////////////////////////////////////////////////////////
@@ -1405,7 +1306,7 @@ end intrinsic;
 intrinsic pHermiteBasis(K::FldNum,p::RngIntElt)->SeqEnum
 {Compute a  p-integral basis of ZK in HNF}
 
-_, _ := Montes(K,p: Basis:=true);
+Montes(K,p: Basis:=true);
 if not IsDefined(K`pHermiteBasis,p) then
     n:=Degree(K);
     Nums:=[Reverse(Eltseq(Numerator(x),Integers())): x in K`pBasis[p]];
@@ -1437,328 +1338,6 @@ end intrinsic;
 /////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////
 
-intrinsic PlainMontes(polynomial::RngUPolElt,p::RngIntElt) -> SeqEnum, SeqEnum
-{}
-
-fa:=Factorization(PolynomialRing(GF(p))!polynomial);
-pol:=polynomial;
-OMreps:=[];
-truefactors:=[];
-for factor in fa do
-    level:=InitialLevel(p,pol,factor[1],factor[2]);
-    if factor[2] eq 1 then
-	Append(~OMreps,[level]);
-    else
-	factors,leaves:=PlainMontesloop(level);
-	truefactors cat:=factors;  
-	OMreps cat:=leaves;  
-    end if;
-    pol:=OMreps[#OMreps,1]`Pol;
-end for;
-for i in [1..#OMreps] do
-    OMreps[i,1]`Pol:=pol;
-end for;
-return truefactors,OMreps;
-end intrinsic;
-/////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////
-
-intrinsic PlainMontesTrunc(polynomial::RngUPolElt,p::RngIntElt) -> SeqEnum, SeqEnum
-{}
-
-fa:=Factorization(PolynomialRing(GF(p))!polynomial);
-pol:=polynomial;
-OMreps:=[];
-truefactors:=[];
-for factor in fa do
-    level:=InitialLevel(p,pol,factor[1],factor[2]);
-    if factor[2] eq 1 then
-	Append(~OMreps,[level]);
-    else
-	factors,leaves:=PlainMontesloopTrunc(level);
-	truefactors cat:=factors;  
-	OMreps cat:=leaves;  
-    end if;
-    pol:=OMreps[#OMreps,1]`Pol;
-end for;
-for i in [1..#OMreps] do
-    OMreps[i,1]`Pol:=pol;
-end for;
-return truefactors,OMreps;
-end intrinsic;
-
-//////////////////////////////////////////////////////
-//////////////////////////////////////////////////////
-
-intrinsic PlainMontesloopTrunc(level)-> SeqEnum, SeqEnum
-{}
-
-Leaves:=[];	
-truefactors:=[];
-Stack:=[[level]];
-while #Stack gt 0 do	  
-    type:=Stack[#Stack];
-    Prune(~Stack);
-    r:=#type;
-    sides:=[];
-    devsEachSide:=[* *];
-    NewtonTrunc(r,~type,~sides,~devsEachSide,~truefactors);
-    for i in [1..#Stack] do
-	Stack[i,1]`Pol:=type[1]`Pol;
-    end for;
-    for i:=#sides to 1 by -1 do 
-	side:=sides[i];
-	type[r]`h:=-Numerator(side[1]);
-	type[r]`e:=Denominator(side[1]);
-	type[r]`slope:=-side[1];
-	type[r]`invh:=InverseMod(type[r]`h,type[r]`e);
-	respol:=0;
-	ResidualPolynomial(r,~type,~devsEachSide[i],~respol);
-        respol:=respol/LeadingCoefficient(respol);
-	factors:=Factorization(respol);
-        for factor in factors do       
-            ta:=type;  
-            ta[r]`psi:=factor[1];
-	    ta[r]`f:=Degree(ta[r]`psi);
-	    Representative(~ta);
-	    if Degree(ta[r]`Phi) eq Degree(ta[r+1]`Phi) then
-		ta[r]`cuttingslope:=-side[1];
-		ta[r]`Phi:=ta[r+1]`Phi;
-		ta[r]`omega:=factor[2];
-		Prune(~ta);  
-	    else
-		ta[r+1]`omega:=factor[2]; 
-	    end if; 
-	    if ta[#ta]`omega eq 1 then
-		Append(~Leaves,ta);
-	    else
-		Append(~Stack,ta);
-	    end if;
-        end for;     
-    end for;
-end while;
-return truefactors, Leaves;
-end intrinsic;
-
-////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////
-
-intrinsic NewtonTrunc(i,~type,~sides,~devsEachSide,~truefactors)
-{Given a type of order at least i, and the phiadic expansion of a polynomial, compute:
-  - sides=list of sides of the r-th order Newton polygon w.r.t. the type;
-  - devsEachSide[k]=list of multiadic phi_1,...,phi_i-1 expansion of the coefficients of 
-  the polynomial whose attached point lies on sides[k].}
-
-require i le #type: "the first input is too large";
-cloud:=[];
-alldevs:=[* *];
-val:=0;
-dev:=[* *];
-r:=#type;
-p:=type[1]`Prime;
-V:=type[i]`V;
-e:=type[i]`prode;
-quot:=type[1]`Pol;
-phi:=type[r]`Phi;
-quot,a:=Quotrem(quot,phi);
-firstabscissa:=0;
-step:=0;
-if a eq 0 then
-    type[1]`Pol:=quot;
-    Append(~truefactors,phi);
-    quot,a:=Quotrem(quot,phi);
-    firstabscissa+:=1;
-    step+:=V;
-end if;
-ValueTrunc(i,~type,a,~dev,~val);
-Append(~cloud,<firstabscissa,val+step>);  
-Append(~alldevs,dev);
-lastfiniteval:=val;
-distance:=0;    
-for k in [firstabscissa+1..type[#type]`omega] do
-    step+:=V;
-    distance+:=V;
-    Zm:=PolynomialRing(Integers(p^Ceiling((lastfiniteval-distance)/e)));
-    quot,a:=Quotrem(Zm!quot,Zm!phi);
-    if a ne 0 then 
-	ValueTrunc(i,~type,a,~dev,~val);
-    	Append(~cloud,<k,val+step>);  
-	Append(~alldevs,dev);
-	lastfiniteval:=val;
-	distance:=0;
-    end if;
-end for;
-V:=NewtonPolygon(cloud);
-s:=LowerVertices(V);
-sides:=[[LowerSlopes(V)[k],s[k,1],s[k,2],s[k+1,1],s[k+1,2]]: k in [1..#LowerSlopes(V)]];
-abscissas:=[x[1] : x in cloud];
-zero:=[];
-if i eq 1 then 
-    zero:=0;
-end if;
-devsEachSide:=[* *];
-for sd in sides do
-    height:=Integers()!sd[3];
-    dev:=[* *];
-    for jj:=Integers()!sd[2] to Integers()!sd[4] by Denominator(sd[1]) do 
-	position:=Index(abscissas,jj);
-	if position gt 0 and cloud[position,2] eq height then
-	    Append(~dev,alldevs[position]);
-	else
-	    Append(~dev,zero);
-	end if;
-	height:=height+Numerator(sd[1]);  
-    end for;
-    Append(~dev,[Integers()!sd[2],Integers()!sd[3]]);
-    Append(~devsEachSide,dev);
-end for;
-if #sides eq 0 then
-      sides:=[[0,s[1,1],s[1,2],s[1,1],s[1,2]]];
-      devsEachSide:=[* alldevs[Index(abscissas,Integers()!s[1,1])],[Integers()!s[1,1],Integers()!s[1,2]] *];
-end if;
-end intrinsic;
-
-/////////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////////
-
-intrinsic ValueTrunc(i,~type,poly,~devs,~val)
-{Given a level i, a type and a polynomial poly, compute:
-- devs=multiexpansion with respect to phi_1,...,phi_i-1 of the points in S_lambda_i-1(poly);
-- val=i-th valuation of poly with respect to type.}
-
-pol:=PolynomialRing(Integers())!poly;
-require i le #type+1: "the first input is too large";
-
-if pol eq 0 then
-    val:=Infinity();
-    if i eq 1 then
-	  devs:=0;
-    else
-	  devs:=[];
-    end if;
-    return;
-end if;
-if i eq 1 then 
-    val:=Min([Valuation(c,type[1]`Prime): c in Coefficients(pol)]);
-    devs:=pol;
-    return;
-end if;  
-im1:=i-1;
-p:=type[1]` Prime;
-e:=type[im1]`prode;
-phi:=type[im1]`Phi;
-step:=type[im1]`V+type[im1]`slope;
-ak:=PolynomialRing(Integers())!0;
-quot:=pol;
-k:=-1;
-minheight:=0;
-while ak eq 0 do
-    quot,ak:=Quotrem(quot,phi);
-    k+:=1;
-    minheight+:=step;
-end while;
-dev:=[* *];
-vak:=0;
-ValueTrunc(im1,~type,ak,~dev,~vak);
-firstabscissa:=k;
-last:=k;
-devs:=[* dev *];
-twoe:=2*type[im1]`e;
-if im1 eq 1 then 
-    zero:=0;
-else
-    zero:=[];
-end if;
-val:=vak+minheight-step;
-//print "initial val", val;
-while quot ne 0 and minheight le val do
-    k+:=1;
-    Zm:=PolynomialRing(Integers(p^(1+Floor((val-minheight)/e))));
-    quot,ak:=Quotrem(Zm!quot,Zm!phi);
-    ValueTrunc(im1,~type,ak,~dev,~vak);
-    newval:=vak+minheight;
-//print "val+newval", val, newval;
-    if newval le val then
-	if newval lt val then
-	    val:=newval;
-	    firstabscissa:=k;
-	    devs:=[* dev *];
-	else  
-	for jj:=last+twoe to k by type[im1]`e do;
-	    Append(~devs,zero);
-	end for;
-	Append(~devs,dev);
-	end if;
-    last:=k;
-    end if;
-    minheight+:=step;
-end while;
-//print val,firstabscissa,type[im1]`slope;
-Append(~devs,[firstabscissa,Integers()!(val-firstabscissa*type[im1]`slope)]);
-val:=Integers()!(type[im1]`e*val);
-end intrinsic;
-
-//////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////
-
-intrinsic PlainMontesloop(level)-> SeqEnum, SeqEnum
-{}
-
-Leaves:=[];	
-truefactors:=[];
-Stack:=[[level]];
-while #Stack gt 0 do	  
-    type:=Stack[#Stack];
-    Prune(~Stack);
-    r:=#type;
-    Phiadic,Quotients:=Taylor(type[1]`Pol,type[r]`Phi,type[r]`omega);
-    sides:=[];
-    devsEachSide:=[* *];
-    Newton(r,~type,~Phiadic,~sides,~devsEachSide);
-    if Phiadic[1] eq 0 then
-	for i in [1..#Stack] do
-	    Stack[i,1]`Pol:=Quotients[1];
-	end for;
-	type[1]`Pol:=Quotients[1];
-	Append(~truefactors,type[r]`Phi);
-    end if;
-    for i:=#sides to 1 by -1 do 
-	side:=sides[i];
-	type[r]`h:=-Numerator(side[1]);
-	type[r]`e:=Denominator(side[1]);
-	type[r]`slope:=-side[1];
-	type[r]`invh:=InverseMod(type[r]`h,type[r]`e);
-	respol:=0;
-	ResidualPolynomial(r,~type,~devsEachSide[i],~respol);
-        respol:=respol/LeadingCoefficient(respol);
-	factors:=Factorization(respol);
-        for factor in factors do       
-            ta:=type;  
-            ta[r]`psi:=factor[1];
-	    ta[r]`f:=Degree(ta[r]`psi);
-	    Representative(~ta);
-	    if Degree(ta[r]`Phi) eq Degree(ta[r+1]`Phi) then
-		ta[r]`cuttingslope:=-side[1];
-		ta[r]`Phi:=ta[r+1]`Phi;
-		ta[r]`omega:=factor[2];
-		Prune(~ta);  
-	    else
-		ta[r+1]`omega:=factor[2]; 
-	    end if; 
-	    if ta[#ta]`omega eq 1 then
-		Append(~Leaves,ta);
-	    else
-		Append(~Stack,ta);
-	    end if;
-        end for;     
-    end for;
-end while;
-return truefactors, Leaves;
-end intrinsic;
-
-////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////
-
 intrinsic PrescribedValue(~type,value,~Phi,~logphi)
 {Compute a polynomial Phi=phi_1^a_1...phi_r^a_r such that v_P(p^a_0Psi(theta))=value, 
 where P is the prime determined by the given type with Okutsu depth r. 
@@ -1786,7 +1365,7 @@ end intrinsic;
 
 intrinsic pResultant(p::RngIntElt,polynomial::RngUPolElt,polynomial2::RngUPolElt)-> RngIntElt
 {Compute the p-adic valuation of the resultant of the two given univariate polynomials.
-Note that the resultant itself is not computed.}
+}
 
 require IsPrime(p): "First argument must be a prime integer";
 require (CoefficientRing(polynomial) eq Integers() and IsMonic(polynomial)): "The first polynomial must be monic and integral";
@@ -1808,31 +1387,31 @@ for factor in fa do
     if b eq 0 then 
 	continue; 
     end if;
-    level:=InitialLevel(p,Pol,factor[1],factor[2]);
-    level`alpha:=b;
-    Stack:=[[level]];
+    omrep:=InitialPrimeIdeal(p,Pol,factor[1],factor[2]);
+    omrep`f:=b;
+    Stack:=[omrep];
     while #Stack gt 0 and totalres le mahler do
-	type:=Stack[#Stack];
+	omrep:=Stack[#Stack];
 	Prune(~Stack);
-	r:=#type;
-	Phiadic,Quotients:=Taylor(type[1]`Pol,type[r]`Phi,type[r]`omega);
-	Phiadic2,Quotients2:=Taylor(Pol2,type[r]`Phi,type[r]`alpha);
+	r:=#omrep`Type;
+	Phiadic:=Taylor(Pol,omrep`Type[r]`Phi,omrep`Type[r]`omega);
+	Phiadic2:=Taylor(Pol2,omrep`Type[r]`Phi,omrep`f);
 	sides:=[]; 
 	sides2:=[];
 	devsSides:=[* *]; 
 	devsSides2:=[* *];	  
-	Newton(r,~type,~Phiadic,~sides,~devsSides);
-	Newton(r,~type,~Phiadic2,~sides2,~devsSides2);
-	partialres:=-type[r]`cuttingslope*type[r]`omega*type[r]`alpha; 
+	Newton(r,~omrep`Type,~Phiadic,p,~sides,~devsSides);
+	Newton(r,~omrep`Type,~Phiadic2,p,~sides2,~devsSides2);
+	partialres:=-omrep`Type[r]`cuttingslope*omrep`Type[r]`omega*omrep`f; 
 	if sides[1,2] gt 0 then
 	    if sides2[1,2] gt 0 then 
 		return Infinity(); 
 	    end if;
 	    partialres+:=sides[1,2]*(sides2[1,3]-sides2[#sides2,5]);
-	    type[1]`Pol:=Quotients[Integers()!sides[1,2]];
+	    Pol:=Pol div omrep`Type[r]`Phi^Integers()!sides[1,2];
 	end if;
 	if sides2[1,2] gt 0 then
-	    Pol2:=Quotients2[Integers()!sides2[1,2]];
+	    Pol2:=Pol2 div omrep`Type[r]`Phi^Integers()!sides2[1,2];
 	    partialres+:=sides2[1,2]*(sides[1,3]-sides[#sides,5]);
 	end if;
 	if sides[1,1] eq 0 or sides2[1,1] eq 0 then 
@@ -1841,14 +1420,14 @@ for factor in fa do
 	for s:=1 to #sides do 
 	    side:=sides[s];
 	    lambda:=side[1];
-	    type[r]`h:=-Numerator(lambda);
-	    type[r]`e:=Denominator(lambda);
-	    type[r]`slope:=-lambda;
-	    type[r]`invh:=InverseMod(type[r]`h,type[r]`e);
-	    lprime:=(1-type[r]`invh*type[r]`h) div type[r]`e;
-	    newPi:=ElementToSequence(type[r]`invh*type[r]`logPhi+lprime*type[r]`logPi);
+	    omrep`Type[r]`h:=-Numerator(lambda);
+	    omrep`Type[r]`e:=Denominator(lambda);
+	    omrep`Type[r]`slope:=-lambda;
+	    omrep`Type[r]`invh:=InverseMod(omrep`Type[r]`h,omrep`Type[r]`e);
+	    lprime:=(1-omrep`Type[r]`invh*omrep`Type[r]`h) div omrep`Type[r]`e;
+	    newPi:=ElementToSequence(omrep`Type[r]`invh*omrep`Type[r]`logPhi+lprime*omrep`Type[r]`logPi);
 	    Append(~newPi,0);
-	    type[r]`logGamma:=type[r]`e*type[r]`logPhi-type[r]`h*type[r]`logPi;
+	    omrep`Type[r]`logGamma:=omrep`Type[r]`e*omrep`Type[r]`logPhi-omrep`Type[r]`h*omrep`Type[r]`logPi;
 	    acumE:=0;
 	    acumH:=0;
 	    for side2 in sides2 do
@@ -1864,51 +1443,48 @@ for factor in fa do
 		continue; 
 	    end if;
 	    psi:=0;
-	    ResidualPolynomial(r,~type,~devsSides[s],~psi);
+	    ResidualPolynomial(r,~omrep`Type,p,~devsSides[s],~psi);
 	    respol:=psi/LeadingCoefficient(psi);
-	    ResidualPolynomial(r,~type,~devsSides2[lloc],~psi);
+	    ResidualPolynomial(r,~omrep`Type,p,~devsSides2[lloc],~psi);
 	    respol2:=psi/LeadingCoefficient(psi);
 	    factors:=Factorization(respol);
 	    for factor in factors do        
-		b:=VValuation(respol2,factor[1]);
-		if b eq 0 then 
+		newomrep:=omrep;
+		newomrep`f:=VValuation(respol2,factor[1]);
+		if newomrep`f eq 0 then 
 		    continue; 
 		end if;
-		ta:=type;  
-		ta[r]`psi:=factor[1];
-		ta[r]`f:=Degree(factor[1]);
-		ta[r]`alpha:=b; 
-		if ta[r]`omega eq 1 then
-		    ta[1]`Phiadic[1]:=Phiadic[1];
-		    ta[1]`Phiadic[2]:=Phiadic[2];
-		    SFL(~ta,2*ta[r]`h);     
-		    ta[r]`cuttingslope:=ta[r]`h;
+		newomrep`Type[r]`psi:=factor[1];
+		newomrep`Type[r]`f:=Degree(factor[1]);
+		if newomrep`Type[r]`omega eq 1 then
+		    newomrep`Phiadic[1]:=Phiadic[1];
+		    newomrep`Phiadic[2]:=Phiadic[2];
+		    SFL(~newomrep,2*newomrep`Type[r]`h,Pol);     
+		    newomrep`Type[r]`cuttingslope:=newomrep`Type[r]`h;
 		else
-		    Representative(~ta);
+		    Representative(~newomrep`Type,p);
 		    r1:=r+1;
 		    if factor[2] eq 1 then 
-			nur:=&+[ta[j]`slope/ta[j]`prode: j in [1..r]]; 
-			ta[1]`sfl[1]:=Floor((ta[r1]`V/ta[r1]`prode)-nur);
+			nur:=&+[newomrep`Type[j]`slope/newomrep`Type[j]`prode: j in [1..r]]; 
+			newomrep`exponent:=Floor((newomrep`Type[r1]`V/newomrep`Type[r1]`prode)-nur);
 		    end if;
-		    if Degree(ta[r]`Phi) eq Degree(ta[r1]`Phi) then 
-			ta[r]`Phi:=ta[r1]`Phi;
-			ta[r]`omega:=factor[2];
-			ta[r]`cuttingslope:=ta[r]`h;
-			Prune(~ta);
+		    if Degree(newomrep`Type[r]`Phi) eq Degree(newomrep`Type[r1]`Phi) then 
+			newomrep`Type[r]`Phi:=newomrep`Type[r1]`Phi;
+			newomrep`Type[r]`omega:=factor[2];
+			newomrep`Type[r]`cuttingslope:=newomrep`Type[r]`h;
+			Prune(~newomrep`Type);
 		    else
-			ta[r1]`omega:=factor[2];
-			ta[r1]`alpha:=b;
-			ta[r1]`logPi:=Vector(newPi);         
-			vect:=-ta[r+1]`V*ta[r+1]`logPi;
+			newomrep`Type[r1]`omega:=factor[2];
+			newomrep`Type[r1]`logPi:=Vector(newPi);         
+			vect:=-newomrep`Type[r+1]`V*newomrep`Type[r+1]`logPi;
 			vect[r+2]:=1;
-			ta[r+1]`logPhi:=vect; 
-		
+			newomrep`Type[r+1]`logPhi:=vect; 
 		    end if; 
 		end if;
-		Append(~Stack,ta);
+		Append(~Stack,newomrep);
 	    end for;     
 	end for; 
-	totalres+:=type[r]`prodf*Integers()!partialres;
+	totalres+:=newomrep`Type[r]`prodf*Integers()!partialres;
     end while; 
     if totalres gt mahler then 
 	return Infinity(); 
@@ -1965,10 +1541,10 @@ while value eq 0 do
     if i lt #P`Type then
 	i+:=1;
     else
-	SFL(~P`Parent,~P,2*P`Type[#P`Type]`h);
+	SFL(~P,2*P`Type[#P`Type]`h: update:=true);
     end if;
-    Value(i+1,~P`Type,~numPol,~dev,~val);
-    ResidualPolynomial(i,~P`Type,~dev,~respol);
+    Value(i+1,~P`Type,~numPol,P`IntegerGenerator,~dev,~val);
+    ResidualPolynomial(i,~P`Type,P`IntegerGenerator,~dev,~respol);
     if VValuation(respol,P`Type[i]`psi) eq 0 then
 	value:=val*(P`e div (P`Type[i]`e*P`Type[i]`prode));
     end if;
@@ -2027,7 +1603,7 @@ end intrinsic;
 /////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////
 
-intrinsic Representative(~type)
+intrinsic Representative(~type,p)
 {Construction of a representative phi of a type. 
 We add phi and V at a new level of type}
 
@@ -2035,7 +1611,7 @@ s:=#type;
 ef:=type[s]`e*type[s]`f;
 u:=ef*type[s]`V+type[s]`f*type[s]`h;                          
 newphi:=0;
-Construct(s,~type,Reductum(type[s]`psi),0,u,~newphi);                   
+Construct(s,~type,p,Reductum(type[s]`psi),[0,u],~newphi);                   
 newphi+:=type[s]`Phi^ef;          
 newlevel:=rec<TypeLevel| 
 Phi:=newphi, 
@@ -2064,7 +1640,7 @@ end intrinsic;
 /////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////
 
-intrinsic ResidualPolynomial(i,~type,~devsSide,~psi)
+intrinsic ResidualPolynomial(i,~type,p,~devsSide,~psi)
 {Internal procedure to compute the i-th residual polynomial psi with respect to
 a side S  of slope -type[i]`slope of the Newton polygon of a certain polynomial Pol. 
 The coefficients of Pol whose attached  points in N_i(Pol) lie on S have multiadic expansions 
@@ -2079,7 +1655,7 @@ if i eq 1 then
     for j:=1 to #devsSide-1 do
 	dev:=devsSide[j];
 	if not dev eq 0 then
-	    rescoeffs[j]:=Evaluate(dev div type[1]`Prime^height,type[i]`z);
+	    rescoeffs[j]:=Evaluate(dev div p^height,type[i]`z);
 	end if;
     height:=height-type[i]`h;
     end for;
@@ -2089,7 +1665,7 @@ else
 	dev:=devsSide[j];
 	if not #dev eq 0 then
 	    txp:=lprime*dev[#dev,1]-type[i-1]`invh*dev[#dev,2];
-	    ResidualPolynomial(i-1,~type,~dev,~pj);
+	    ResidualPolynomial(i-1,~type,p,~dev,~pj);
 	    rescoeffs[j]:=type[i]`z^txp*Evaluate(pj,type[i]`z);
 	end if;
     end for;
@@ -2100,59 +1676,51 @@ end intrinsic;
 /////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////
 
-intrinsic SFL(~type::SeqEnum,slope::RngIntElt)
-{in type[1]`sfl and type[1]`Phiadic we stored relevant data. The aim is type[#type]`slope>=slope}
+intrinsic SFL(~P::Rec,slope::RngIntElt,Pol: UPD:=false)
+{in P`sfl and P`Phiadic we stored relevant data. The aim is P`Type[#P`Type]`slope>=slope}
 
-ord:=#type;
-if type[ord]`slope ge slope then
+p:=P`IntegerGenerator;
+ord:=#P`Type;
+if P`Type[ord]`slope ge slope then
     return;
 end if;
-
-if type[1]`sfl[3] eq 0 then
-    SFLInitialize(~type);
+if P`sfl[3] eq 0 then
+    SFLInitialize(~P,Pol);
 end if;
-
-p:=type[1]`Prime;
-exponent:=type[1]`sfl[1];
-nu:=type[1]`sfl[2];
-x0prec:=type[1]`sfl[3];
-x0num:=type[1]`Phiadic[4];
-x0den:=type[1]`sfl[4];
-e:=type[ord]`prode;
-h:=type[ord]`h-type[ord]`cuttingslope;
-lasth:=slope-type[ord]`cuttingslope;
-V:=type[ord]`V+type[ord]`cuttingslope;
+nu:=P`sfl[2];
+x0prec:=P`sfl[3];
+x0num:=P`Phiadic[4];
+x0den:=P`sfl[4];
+e:=P`Type[ord]`prode;
+h:=P`Type[ord]`h-P`Type[ord]`cuttingslope;
+lasth:=slope-P`Type[ord]`cuttingslope;
+V:=P`Type[ord]`V+P`Type[ord]`cuttingslope;
 
 Zp:=pAdicRing(p);
 piZp:=UniformizingElement(Zp);
-Zp`DefaultPrecision:=nu+exponent+Ceiling((V+lasth)/e);
-PolZp:=AdaptPrecision(Zp,type[1]`Phiadic[5],type[1]`ProdQuots);	
-PsinumZp:=AdaptPrecision(Zp,type[1]`Phiadic[3],type[1]`ProdQuotsVals);
-
+Zp`DefaultPrecision:=nu+P`exponent+Ceiling((V+lasth)/e);
+PolZp:=AdaptPrecision(Zp,P`Phiadic[5],P`Phiadic[6]);	
+PsinumZp:=AdaptPrecision(Zp,P`Phiadic[3],P`Phiadic[7]);
 path:=PathOfPrecisions(lasth,h);
 shortpath:=PathOfPrecisions(h,x0prec);
-
-Zp`DefaultPrecision:=nu+exponent+Ceiling(h/e);
-a1:=PolynomialRing(Zp)!type[1]`Phiadic[2];
-
-zq:=quo<Zp|piZp^(nu+exponent+Ceiling((V+path[2])/e))>;
+Zp`DefaultPrecision:=nu+P`exponent+Ceiling(h/e);
+a1:=PolynomialRing(Zp)!P`Phiadic[2];
+zq:=quo<Zp|piZp^(nu+P`exponent+Ceiling((V+path[2])/e))>;
 zqt<t>:=PolynomialRing(zq);
-phi:=zqt!type[ord]`Phi;
+phi:=zqt!P`Type[ord]`Phi;
 Psinum:= zqt!PsinumZp;
-A0num, A0den := Cancel((zqt!type[1]`Phiadic[1]*Psinum) mod phi,nu);
+A0num, A0den := Cancel((zqt!P`Phiadic[1]*Psinum) mod phi,nu);
 A1num, A1den := Cancel((zqt!a1*Psinum) mod phi,nu);
-
 for i in [2..#shortpath] do
     lowprecision:=A1den+2*x0den+Ceiling(shortpath[i]/e);
     Inversionloop([* A1num,A1den *],~x0num,~x0den,phi,lowprecision,Zp);
 end for;  
-
 Anum, Aden := Cancel((A0num*zqt!x0num) mod phi, x0den);
 phi:=phi+Anum;
-//print "primera h", testh(type,phi);
+//print "primera h", testh(P`Type,phi,p,Pol);
 
 for i in [2..#path-1] do
-    zq:=quo<Zp|piZp^(nu+exponent+Ceiling((V+path[i+1])/e))>;
+    zq:=quo<Zp|piZp^(nu+P`exponent+Ceiling((V+path[i+1])/e))>;
     zqt<t>:=PolynomialRing(zq);
     phi:=zqt!phi;
     Psinum:= zqt!PsinumZp;
@@ -2164,24 +1732,26 @@ for i in [2..#path-1] do
     Inversionloop([* C1num,C1den *],~x0num,~x0den,phi,lowprecision,Zp);
     Cnum,Cden:=Cancel((C0num*zqt!x0num) mod phi, x0den);
     phi:=phi+Cnum;
-//print "nova h", i, testh(type,phi);
+//print "nova h", i, testh(P`Type,phi,Pol);
 end for;
-
-type[1]`sfl[3]:=Max([h,path[#path-1]]);
-type[ord]`Phi:=PolynomialRing(Integers())!phi;
-type[1]`Phiadic[4]:=x0num;
-type[1]`sfl[4]:=x0den;
+P`Type[ord]`Phi:=PolynomialRing(Integers())!phi;
+if UPD then
+    P`sfl[3]:=Max([h,path[#path-1]]);
+    P`Phiadic[4]:=x0num;
+    P`sfl[4]:=x0den;
+    UpdateLastLevel(~P,Pol);
+end if;
 end intrinsic;
 
 ///////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////
 
-intrinsic testh(type,phi) -> RngIntElt
+intrinsic testh(type,phi,p,Pol) -> RngIntElt
 {}
 
 newphi:=PolynomialRing(Integers())!phi;
 print "newphi", newphi;
-qq,a0:=Quotrem(type[1]`Pol,newphi);
+qq,a0:=Quotrem(Pol,newphi);
 if a0 eq 0 then 
     slope:=Infinity();
 else    
@@ -2189,7 +1759,7 @@ else
     devs:=[* *];
     phiadic:=[a0,qq mod newphi];
     ty:=type;
-    Newton(#ty,~ty,~phiadic,~sides,~devs);
+    Newton(#ty,~ty,~phiadic,p,~sides,~devs);
     slope:=-Integers()!sides[1,1];
 end if;
 return slope;
@@ -2198,59 +1768,52 @@ end intrinsic;
 ///////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////
 
-intrinsic SFL(~K::FldNum,~P::Rec,slope::RngIntElt)
-{Given a prime ideal P in the number field K, improve its Okutsu approximation 
-phi_(r+1) till P`Type[r+1]`slope> slope. 
-The last level of P`Type is updated with data of the new Okutsu approximation.
+intrinsic SFL(~P::Rec,slope::RngIntElt: update:=false)
+{Given a prime ideal P in a number field, improve its Okutsu approximation phi_(r+1) until P`Type[r+1]`slope>=slope. 
+If update=true, the last level of P`Type is updated with data of the new Okutsu approximation.
 }
 
-if P`Type[#P`Type]`slope ge slope then
-    return;
-end if;
-SFL(~P`Type,slope);
-UpdateLastLevel(~P`Type);
-K`PrimeIdeals[P`IntegerGenerator,P`Position]`Type[#P`Type]:=P`Type[#P`Type];
-K`PrimeIdeals[P`IntegerGenerator,P`Position]`Type[1]:=P`Type[1];
+SFL(~P,slope,DefiningPolynomial(P`Parent): UPD:=update);
 end intrinsic;
 
 //////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////
 
-intrinsic SFLInitialize(~type)
+intrinsic SFLInitialize(~P,Pol)
 {Initialize certain values of the given type, which are necessary for the SFL routine.}
 
-p:=type[1]`Prime;
-r:=#type;
-e:=type[r]`prode;
-a1:=type[1]`Phiadic[2];
+p:=P`IntegerGenerator;
+r:=#P`Type;
+e:=P`Type[r]`prode;
+a1:=P`Phiadic[2];
 Psinum:=PolynomialRing(Integers())!1;
 if r eq 1 then
     nu:=Min([Valuation(x,p): x in Coefficients(a1)]);
-    class:=Evaluate(a1 div p^nu,type[1]`z);
+    class:=Evaluate(a1 div p^nu,P`Type[1]`z);
 else
     val:=0;
     dev:=[* *];
-    Value(r,~type,~a1,~dev,~val);
+    Value(r,~P`Type,~a1,p,~dev,~val);
     respol:=0;
-    ResidualPolynomial(r-1,~type,~dev,~respol);
+    ResidualPolynomial(r-1,~P`Type,p,~dev,~respol);
     logpsi:=0;
     qq,s:=Quotrem(-val,e);
-    PrescribedValue(~type,s,~Psinum,~logpsi);
+    PrescribedValue(~P`Type,s,~Psinum,~logpsi);
     nu:=-logpsi[1]-qq;
-    vector:=dev[#dev,1]*type[r-1]`logPhi+dev[#dev,2]*type[r-1]`logPi;
+    vector:=dev[#dev,1]*P`Type[r-1]`logPhi+dev[#dev,2]*P`Type[r-1]`logPi;
     class:=0;
-    ConvertLogs(~type,logpsi+vector,~class);
-    class*:=Evaluate(respol,type[r]`z);
+    ConvertLogs(~P`Type,logpsi+vector,~class);
+    class*:=Evaluate(respol,P`Type[r]`z);
 end if;
-type[1]`sfl[2]:=nu;
-type[1]`sfl[3]:=1;
-x0num:=0;
-x0den:=0;
-LocalLift(~type,class^(-1),~x0num,~x0den);
-type[1]`Phiadic[4]:=x0num;
-type[1]`sfl[4]:=x0den;
-type[1]`Phiadic[5],type[1]`ProdQuots:=FaithfulpAdicConversion(type[1]`Pol,p);
-type[1]`Phiadic[3],type[1]`ProdQuotsVals:=FaithfulpAdicConversion(Psinum,p);
+P`sfl[2]:=nu;
+P`sfl[3]:=1;
+//x0num:=0;
+//x0den:=0;
+LocalLift(~P`Type,p,class^(-1),~P`Phiadic[4],~P`sfl[4]);
+//P`Phiadic[4]:=x0num;
+//P`sfl[4]:=x0den;
+P`Phiadic[5],P`Phiadic[6]:=FaithfulpAdicConversion(Pol,p);
+P`Phiadic[3],P`Phiadic[7]:=FaithfulpAdicConversion(Psinum,p);
 end intrinsic;
 
 ///////////////////////////////////////////////////////////////
@@ -2270,10 +1833,11 @@ beta:=P`Parent!0;
 precision:=Ceiling(m/P`e)-exp;
 if precision gt 0 then
     power:=p^precision;
-    SFL(~P`Parent,~P,precision*P`e-P`Type[#P`Type]`V);
+    SFL(~P,precision*P`e-P`Type[#P`Type]`V);
     phi:=P`Type[#P`Type]`Phi mod power;
     num:=(InverseMod(den,power)*num mod phi) mod power;
-    beta:=Evaluate(num,P`Parent.1)*p^exp;  
+//    beta:=Evaluate(num,P`Parent.1)*p^exp;  
+    beta:=P`Parent!Eltseq(num)*p^exp;  
 end if;
 end intrinsic;
 
@@ -2318,14 +1882,11 @@ intrinsic Taylor(pol::RngUPolElt,phi::RngUPolElt,omega::RngIntElt)->SeqEnum
 {Compute the first omega+1 coefficients of the phi-expansion of pol}
 quot:=pol;
 Coeffs:=[];
-Quos:=[];
 for j:=0 to omega do 
   	quot,rem:=Quotrem(quot,phi);
   	Append(~Coeffs,rem);
-	Append(~Quos,quot);
 end for;
-Prune(~Quos);
-return Coeffs,Quos;
+return Coeffs;
 end intrinsic;
 
 /////////////////////////////////////////////////////////////////////////////////////
@@ -2364,30 +1925,31 @@ end if;
 return K`Discriminant, K`FactorizedDiscriminant;
 end intrinsic;
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 ///////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////
 
-intrinsic UpdateLastLevel(~type)
-{Update the values of slope, h, psi and logGamma in the last level of the given type.}
+intrinsic UpdateLastLevel(~P,Pol)
+{Updates the values of slope, h, psi and logGamma in the last level of P`Type.
+Also, it updates P`Phiadic[1]=a0 and P`Phiadic[2]=a1.
+}
 
-qq,a0:=Quotrem(type[1]`Pol,type[#type]`Phi);
+r:=#P`Type;
+qq,a0:=Quotrem(Pol,P`Type[r]`Phi);
 if a0 eq 0 then 
-    type[#type]`slope:=Infinity();
+    P`Type[r]`slope:=Infinity();
 else    
-    type[1]`Phiadic[1]:=a0;
-    type[1]`Phiadic[2]:=qq mod type[#type]`Phi;
+    P`Phiadic[1]:=a0;
+    P`Phiadic[2]:=qq mod P`Type[r]`Phi;
     sides:=[];
     devs:=[* *];
-    phiadic:=[a0,type[1]`Phiadic[2]];
-    Newton(#type,~type,~phiadic,~sides,~devs);
-    type[#type]`slope:=-sides[1,1];
-    type[#type]`h:=-Integers()!sides[1,1];
+    phiadic:=[a0,P`Phiadic[2]];
+    Newton(r,~P`Type,~phiadic,P`IntegerGenerator,~sides,~devs);
+    P`Type[r]`slope:=-sides[1,1];
+    P`Type[r]`h:=-Integers()!sides[1,1];
     psi:=0;
-    ResidualPolynomial(#type,~type,~devs[1],~psi);
-    type[#type]`psi:=psi/LeadingCoefficient(psi);
-    type[#type]`logGamma:=type[#type]`logPhi-type[#type]`h*type[#type]`logPi;
+    ResidualPolynomial(r,~P`Type,P`IntegerGenerator,~devs[1],~psi);
+    P`Type[r]`psi:=psi/LeadingCoefficient(psi);
+    P`Type[r]`logGamma:=P`Type[r]`logPhi-P`Type[r]`h*P`Type[r]`logPi;
 end if;
 end intrinsic;
 
@@ -2395,7 +1957,7 @@ end intrinsic;
 /////////////////////////////////////////////////////////////////////////////////////
 
 
-intrinsic Value(i,~type,~pol,~devs,~val)
+intrinsic Value(i,~type,~pol,p,~devs,~val)
 {Given a level i, a type and a polynomial pol, compute:
 - devs=multiexpansion with respect to phi_1,...,phi_i-1 of the points in S_lambda_i-1(pol);
 - val=i-th valuation of pol with respect to type.}
@@ -2411,7 +1973,7 @@ if pol eq 0 then
     return;
 end if;
 if i eq 1 then 
-    val:=Min([Valuation(c,type[1]`Prime): c in Coefficients(pol)]);
+    val:=Min([Valuation(c,p): c in Coefficients(pol)]);
     devs:=pol;
 else  
     im1:=i-1;
@@ -2430,7 +1992,7 @@ else
     end if;
     while quot ne 0 and minheight le val do
 	quot,ak:=Quotrem(quot,type[im1]`Phi);
-        Value(im1,~type,~ak,~dev,~newval);
+        Value(im1,~type,~ak,p,~dev,~newval);
 	candidate:=newval+minheight;
 	if candidate le val then
 	    if candidate lt val then
@@ -2536,7 +2098,6 @@ for p in RationalRadical(aI) do
     Generators(I`Parent,p);
     ppart:=[P: P in list | P[1] eq p];
     Hp:=Max([P[3]/I`Parent`PrimeIdeals[p,P[2]]`e : P in ppart]);   
-    //print "Hp:", p, Hp;
     alphap:=&*[I`Parent`PrimeIdeals[p,P[2]]`Generator^P[3]: P in ppart]; 
     if Denominator(Hp) eq 1 then 
 	multp:=p;
@@ -2549,7 +2110,6 @@ for p in RationalRadical(aI) do
     denalpha*:=Denominator(alphap);
     Append(~precisions,firstp*Denominator(alphap)*multp);
 end for;
-//print "integer generator:", ig, "/", a;
 I`IntegerGenerator:=ig/a;
 numalpha:=[];
 CoeffMatrix:=Transpose(Matrix(Nums));
@@ -2912,7 +2472,7 @@ if not assigned I`Factorization then
     for p in primes do
         h1:=[Valuation(x,p): x in nums];
         h2:=[Valuation(x,p): x in dens];
-        _, _ := Montes(K,p);
+        Montes(K,p);
         for j in [1..#K`PrimeIdeals[p]] do
             P:=K`PrimeIdeals[p,j];
             h:=[PValuation(x,P): x in betas];
@@ -3002,8 +2562,11 @@ end intrinsic;
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
-intrinsic EnlargeType(  h,e,psi,~t, ~Y,~z)
+intrinsic EnlargeType( slope,psi,~t,p, ~Y,~z)
 {Enlarge the given type t (and the lists Y, z) with the slope -h/e and residual polynomial psi.}
+
+h:=slope[1];
+e:=slope[2];
 k:=#t;
 t[k]`psi:=psi;
 t[k]`h:=h;
@@ -3024,7 +2587,7 @@ redpsi:=Reductum(psi);
 Fq0:=t[k]`Fq;
 newpsi:=twist*PolynomialRing(Fq0)!redpsi; 
 Phi3:=PolynomialRing(Integers()).1;
-Construct(k,~t,newpsi,0,H,~Phi3);
+Construct(k,~t,p,newpsi,[0,H],~Phi3);
 Phi3:=Phi3+t[k]`Phi^(e*t[k]`f); 
 Append(~t,rec<TypeLevel|>);
 t[k+1]`Phi:=Phi3;
@@ -3065,7 +2628,7 @@ for j:=1 to r do
         if f gt 1 or Coefficient(psi,0) ne CoefficientRing(psi)!0 then test:=false; end if;
     end while;
     vprint montestalk,1: "Psi",Sprint(j), "=",psi;
-    EnlargeType(h,e,psi,~t,~Y,~z);
+    EnlargeType([h,e],psi,~t,p,~Y,~z);
 end for;
 return t;
 end intrinsic;
@@ -3092,7 +2655,7 @@ for j:=1 to r do
         if f gt 1 or Coefficient(psi,0) ne CoefficientRing(psi)!0 then test:=false; end if;
     end while;
     vprint montestalk,1: "Psi",Sprint(j), "=",psi;
-    EnlargeType(h,e,psi,~t,~Y,~z);
+    EnlargeType([h,e],psi,~t,p,~Y,~z);
 end for;
 return t;
 end intrinsic;
@@ -3132,11 +2695,11 @@ end intrinsic;
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
-intrinsic CombineTypes(listoftypes::SeqEnum)->RngUPolElt
+intrinsic CombineTypes(listoftypes::SeqEnum,p)->RngUPolElt
 {Compute and irreducible polynomial whose attached types are the given ones in the specified list.}
 pol:=&*[t[#t]`Phi: t in listoftypes];
-p:=listoftypes[1][1]`Prime^20;
-while not IsIrreducible(pol) do pol:=pol+p^20; end while;
+pp:=p^20;
+while not IsIrreducible(pol) do pol:=pol+pp^20; end while;
 return pol;
 end intrinsic;
 
@@ -3217,10 +2780,9 @@ coeffslist:=GlobalExpansion(pol,t);
 return ExpandTeXAux(coeffslist,t);
 end intrinsic;
 
-intrinsic ExpandTeXAux(coeffslist,t)->Str
+intrinsic ExpandTeXAux(coeffslist,t,p)->Str
 {}
 len:=#coeffslist;
-p:=t[1]`Prime;
 if len eq 0 then polstr:="0";
 else
     k:=#t;
@@ -3272,13 +2834,12 @@ end intrinsic;
 
 
 
-intrinsic ExpandPhiTeX(k,t)->Str
+intrinsic ExpandPhiTeX(k,t,p)->Str
 {Write the phi-adic expansion of phi_k in TeX format}
 polstr:="";
 if k eq 0 then 
         coeffslist:=Coefficients(t[1]`Phi);
         len:=#coeffslist;
-        p:=t[1]`Prime;
         for j:=len to 1 by -1 do
              if coeffslist[j] ne 0 then 
                     ss:=Valuation(Integers()!coeffslist[j],p);cc:=Rationals()!coeffslist[j]/p^ss;
@@ -3322,10 +2883,9 @@ coeffslist:=GlobalExpansion(pol,t);
 return ExpandMagmaAux(coeffslist,t);
 end intrinsic;
 
-intrinsic ExpandMagmaAux(coeffslist,t)->Str
+intrinsic ExpandMagmaAux(coeffslist,t,p)->Str
 {}
 len:=#coeffslist;
-p:=t[1]`Prime;
 if len eq 0 then polstr:="0";
 else
     k:=#t;
@@ -3401,12 +2961,12 @@ end intrinsic;
 
 /*  Functions addressed to the users, pending of revision
 
-intrinsic Value(r,type,pol) -> RngIntElt
+intrinsic Value(r,type,pol,p) -> RngIntElt
 {Given an order r, a type and a polynomial pol, compute
 the r-th valuation of pol with respect to the type.
 }
 
-sides:=Newton(r,type,pol);
+sides:=Newton(r,type,pol,p);
 PrincipalPart:=[x : x in sides | x[1] lt 0];
 k:=#PrincipalPart;
 if k gt 0 then
@@ -3417,25 +2977,25 @@ end if;
 end intrinsic;
 
 
-intrinsic Newton(r,type,pol) -> SeqEnum
+intrinsic Newton(r,type,pol,p) -> SeqEnum
 {Given a type of order at least r, and a polynomial pol, compute the
 list of sides of the r-th order Newton polygon with respect to the type.
 }
 phiadic:=Taylor(pol,type[r]`Phi,Floor(Degree(pol)/Degree(type[r]`Phi)));
 sides:=[];
 devs:=[* *];
-Newton(r,~type,~phiadic,~sides,~devs);
+Newton(r,~type,~phiadic,p,~sides,~devs);
 return sides;
 end intrinsic;
 
-intrinsic ResidualPolynomial(r::RngIntElt, type::SeqEnum, Pol::RngUPolElt)->RngUPolElt 
+intrinsic ResidualPolynomial(r::RngIntElt, type::SeqEnum, Pol::RngUPolElt,p)->RngUPolElt 
 {Compute the r-th residual polynomial of Pol with respect to a type.
 }
 
 phiadic:=Taylor(Pol,type[r]`Phi,Floor(Degree(Pol)/Degree(type[r]`Phi)));
 sides:=[];
 devs:=[* *];
-Newton(r,~type,~phiadic,~sides,~devs);
+Newton(r,~type,~phiadic,p,~sides,~devs);
 previous:=[x: x in sides | -x[1] gt type[r]`slope];
 k:=#previous;
 if k eq #sides then
@@ -3448,12 +3008,12 @@ else
     end if;
 end if;
 psi:=0;
-ResidualPolynomial(r,~type,~dev,~psi);
+ResidualPolynomial(r,~type,p,~dev,~psi);
 return psi;
 end intrinsic;
 
 
-intrinsic Construct(r,type,respol,V) -> RngUPolElt
+intrinsic Construct(r,type,p,respol,V) -> RngUPolElt
 {This routine works out the construction of [HN, Prop. 2.10].
 V is a positive integer >= type[r+1]`V. 
 respol is a polynomial in type[r]`FqY of degree < type[r]`f.
@@ -3464,7 +3024,7 @@ where nu=ord_y(respol).}
 s:=type[r]`invh*V mod type[r]`e;
 u:=(V-type[r]`h*s) div type[r]`e;
 Ppol:=0;
-Construct(r, ~type, respol, s,u, ~Ppol);
+Construct(r, ~type,p, respol, [s,u], ~Ppol);
 return Ppol;
 end intrinsic;
 
@@ -3481,178 +3041,213 @@ end intrinsic;
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+// Local bases
 
-intrinsic HermiteFormBasis(K::FldNum, p::RngIntElt, nums::SeqEnum, dexp::SeqEnum : algorithm:="padic", triangular_input:=false)-> SeqEnum
-    { }
 
-    n := Degree(K);
-    if triangular_input eq true then
-        maxexp := dexp[n];
-    else
-        maxexp := Maximum(dexp);
-    end if;
-    p_max := p^maxexp;
-    Nums := [ [ Coefficient(nums[i], j) * p^(maxexp-dexp[i])
-                :  j in [n-1..0 by -1] ]
-                    : i in [n..1 by -1] ];
+intrinsic IdealBasis(I::Rec : HNF:=false, Separated:=false)->SeqEnum
+    { Compute a (Hermitian) basis of the ideal I. }
 
-    if algorithm eq "triangular" then
-        matrix_red := Matrix(Nums);
-        hnf_matrix := HermiteFormTriangularSimple(matrix_red);
-    elif algorithm eq "padic" then
-        Zp := pAdicRing(p, maxexp+1);
-        pi := UniformizingElement(Zp);
-        matrix_red := Matrix(Zp, Nums);
-        hnf_matrix := HermiteForm(matrix_red);
-    elif algorithm eq "magma" then
-        matrix_red := Matrix(Nums);
-        hnf_matrix := HermiteForm(matrix_red);
-    else
-        printf "Error: Unknown HNF algorithm %o.\n", algorithm;
-        return [];
+	K:=I`Parent;
+    kt:=PolynomialRing(ConstantField(K));
+	tt:=Realtime();
+	
+    if not assigned K`FactorizedDiscriminant then
+ 		d:=kt! Discriminant(DefiningPolynomial(K));   
+    	sq:=SquarefreeFactorization(d);
+		d:=kt!(d/&*[i[1]:i in sq]);
+
+    	K`FactorizedDiscriminant:=Factorization(d);
     end if;
 
-    hnf_basis := Reverse([ K!Reverse(Eltseq(hnf_matrix[i]))/p_max :
-                                i in [1..n] ]);
+    if not assigned K`Index then
+    	Index(K);
+    end if;
 
-    return hnf_basis; 
-end intrinsic; // HermiteFormBasis
+    primes:=SetToSequence(Set(RationalRadical(I) cat K`Index));
+    if primes eq [] then
+    	return [K.1^i:i in [0..Degree(K)-1]],1;
+    end if;
 
-intrinsic HermiteFormBasis(K::FldNum, basis::SeqEnum)-> SeqEnum
-    { We assume that the (global) basis is triangular. }
+    basis, factor := SIdealBasis(I, primes : Alg:=Alg);
 
-    n := #basis;
-    dens := [ Denominator(g) : g in Reverse(basis) ];
-    maxden := dens[1];
+    if HNF eq true then
+        basis := HermiteFormBasis(K, basis);
+    end if;
 
-    int_basis := [ g*maxden : g in Reverse(basis) ];
-    A := Matrix([ Reverse(Eltseq(g*maxden, Integers())) : g in Reverse(basis) ]);
+    if Separated eq false then
+        return [ g*factor : g in basis];
+    else
+        return basis, factor;
+    end if;
+end intrinsic;
 
-    //print A;
-    H := HermiteForm(A);
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
 
-    hnf_basis := [ K!Reverse(Eltseq(H[i]))/maxden : i in [n..1 by -1] ];
-
-    return hnf_basis;
-end intrinsic; // HermiteFormBasis
-
-intrinsic pBasisTriangular(K::FldNum, p::RngIntElt : exp:=false, store:=false, random_exponent:=[0, 0])-> SeqEnum, SeqEnum, SeqEnum
-    { }
-
+intrinsic pBasis(I::Rec, p::RngIntElt : HNF:=true, Separated:=false)->SeqEnum
+    { Computes a p-integral basis of the fractional ideal, optionally
+      in Hermite Form. }
+      
+	K	:=	I`Parent;
     if not assigned(K`PrimeIdeals) or not IsDefined(K`PrimeIdeals, p) then
-        _, _ := Montes(K, p : Basis:=false);
+        Montes(K, p);
     end if;
 
+    J, a := reduceIdeal(I, p);
+
+    B, nums, dexp := pIdealBasis(J, p);
+
+    if HNF eq true then
+        hnf_basis := HermiteFormBasis(I`Parent, p, nums, dexp);
+
+        nums := [ Parent(nums[1])!Eltseq(Numerator(b)) : b in hnf_basis ];
+        B := hnf_basis;
+    end if;
+
+    if Separated eq false then
+        pa := Parent(B[1])!p^a;
+        return [ g*pa : g in B ];
+    else
+        return nums, dexp, a;
+    end if;
+
+end intrinsic; // pBasis
+
+intrinsic pBasis(K::FldNum, p::RngIntElt : HNF:=true, Separated:=false)->SeqEnum
+    { Returns a p-basis of the maximal order. }
+
+    max_order := ideal(K, K!1);
+    Factorization(~max_order);
+
+    return pBasis(max_order, p : HNF:=HNF, Separated:=Separated);
+end intrinsic; // pBasis
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+intrinsic pIdealBasis(I::Rec, p::RngIntElt)-> SeqEnum
+    { Returns a p-basis of a fractional ideal}
+	
+	K	:=	I`Parent;
+
+    exp:=[0:i in [1..#K`PrimeIdeals[p]]];
+	for i in I`Factorization do
+		if i[1] eq p then
+			exp[i[2]]:=i[3];
+		end if;
+	end for;
+	
     // This allows us to only specify up to the highest indexed prime
     // ideal with non-zero exponent.
-    if Type(exp) ne BoolElt then
-        if #K`PrimeIdeals[p] gt #exp then
-            exp cat:= [ Random(random_exponent[1], random_exponent[2])
-                            : i in [#exp+1..#K`PrimeIdeals[p]] ];
+    basis, nums, dexp := MaxMin(K, p : exponents:=exp);
+
+    return basis, nums, dexp;
+end intrinsic; // pIdealBasis
+
+intrinsic reduceIdeal(I::Rec, p::RngIntElt)-> Rec, RngIntElt
+    { Returns a new ideal J and exponent a such that I = p^a J. }
+
+    Primes := I`Parent`PrimeIdeals[p];
+    s := #Primes;
+
+    //Initializing Exponentes of p-part of ideal
+    Expos:=[0:i in [1..s]];
+    for i in I`Factorization do
+        if i[1] eq p then 	
+            Expos[i[2]]:=i[3];
         end if;
+    end for;
+
+    //Ziehe groessten p(t)^a*O_F aus I heraus und speicher p(t)^a 
+    a := 0;
+    if forall{i:i in [1..s]|Expos[i] gt 0 } then
+        a:=Minimum([Floor(Expos[ll]/Primes[ll]`e):ll in [1..s]]);
+        Expos:=[Expos[ll]-Primes[ll]`e*a:ll in [1..s]];
+    end if;
+    if forall{i:i in [1..s]|Expos[i] lt 0 } then
+        a:=Maximum([Ceiling(Expos[ll]/Primes[ll]`e):ll in [1..s]]);
+        Expos:=[Expos[ll]-Primes[ll]`e*a:ll in [1..s]];
     end if;
 
-    p_basis, nums, dexp := MaxMin(K, p : exponents:=exp);
+    J := &*[ I`Parent`PrimeIdeals[p,i]^Expos[i] : i in [1..s] ];
 
-    if store eq true then
-        K`pBasis[p] := p_basis;
+    return J, a;
+end intrinsic; // reduceIdeal
+
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+// Global bases
+
+
+intrinsic IdealBasis(I::Rec : HNF:=false, Separated:=false)->SeqEnum
+    { Compute a (Hermitian) basis of the ideal I. }
+
+	K:=I`Parent;
+    kt:=PolynomialRing(ConstantField(K));
+	tt:=Realtime();
+	
+    if not assigned K`FactorizedDiscriminant then
+ 		d:=kt! Discriminant(DefiningPolynomial(K));   
+    	sq:=SquarefreeFactorization(d);
+		d:=kt!(d/&*[i[1]:i in sq]);
+
+    	K`FactorizedDiscriminant:=Factorization(d);
     end if;
 
-    return p_basis, nums, dexp, exp;
-end intrinsic; // pBasisTriangular
-
-intrinsic pHermiteBasisMaxMin(K::FldNum, p::RngIntElt : algorithm:="triangle")-> SeqEnum
-    { }
-
-    if not assigned(K`pHermiteBasis) or not IsDefined(K`pHermiteBasis, p) then
-        if not assigned(K`PrimeIdeals) or not IsDefined(K`PrimeIdeals, p) then
-            tmps := Cputime();
-            _, _ := Montes(K, p : Basis:=false);
-            Append(~K`Times, Cputime() - tmps);
-        end if;
-
-        p_basis, nums, dexp := MaxMin(K, p);
-
-        n := Degree(K);
-        Dexp := Reverse(dexp);
-        maxexp := Dexp[1];
-        Nums := [ [ Coefficient(nums[i], j) * p^(maxexp-dexp[i])
-                    :  j in [n-1..0 by -1] ]
-                        : i in [n..1 by -1] ];
-
-        if algorithm eq "triangle" then
-            matrix_red := Matrix(Nums);
-            hnf_matrix := HermiteFormTriangularSimple(matrix_red);
-        elif algorithm eq "padic" then
-            Zp := pAdicRing(p, maxexp+1);
-            pi := UniformizingElement(Zp);
-            matrix_red := Matrix(Zp, Nums);
-            hnf_matrix := HermiteForm(matrix_red);
-        else
-            printf "Error: Unknown HNF algorithm %o.\n", algorithm;
-            return [];
-        end if;
-
-        hnf_matrix := Matrix([ [hnf_matrix[i,j] / hnf_matrix[i,i]
-                                : j in [1..n]]
-                                    : i in [1..n] ]);
-        K`pHermiteBasis[p] := basisFromMatrix(hnf_matrix, dexp, K, p);
+    if not assigned K`Index then
+    	Index(K);
     end if;
 
-    return K`pHermiteBasis[p];
-end intrinsic; // pHermiteBasisMaxMin
-
-intrinsic SumTimes(a::SeqEnum, b::SeqEnum)-> SeqEnum
-    { }
-
-    if #a gt #b then
-        b cat:= [Cputime() - Cputime() : i in [#b+1..#a] ];
-    elif #a lt #b then
-        a cat:= [Cputime() - Cputime() : i in [#a+1..#b] ];
+    primes:=SetToSequence(Set(RationalRadical(I) cat K`Index));
+    if primes eq [] then
+    	return [K.1^i:i in [0..Degree(K)-1]],1;
     end if;
 
-    return [ a[i] + b[i] : i in [1..#a] ];
-end intrinsic; // SumTimes
+    basis, factor := SIdealBasis(I, primes);
 
-intrinsic SIntegralBasisMaxMin(K::FldNum, primelist::SeqEnum, explist::SeqEnum : noskip:=false, random_exponent:=[0, 0])-> SeqEnum
-    { Compute a local integral basis for the given set of primes. }
+    if HNF eq true then
+        basis := HermiteFormBasis(K, basis);
+    end if;
 
+    if Separated eq false then
+        return [ g*factor : g in basis];
+    else
+        return basis, factor;
+    end if;
+end intrinsic;
+
+intrinsic SIdealBasis(I::Rec, primelist::SeqEnum)-> SeqEnum
+    { Compute a local integral basis of I for the given set of primes. }
+
+    K := I`Parent;
+    Factorization(~I);
     n := Degree(K);
+    kt := Parent(primelist[1]);
     Numlist := [];
     Denlist := [];
     DenCRTlist := [];
+    factor := 1;
 
     for i in [1..#primelist] do
         p := primelist[i];
-        exp := explist[i];
 
-        _, _ := Montes(K, p);
-        if #exp lt #K`PrimeIdeals[p] then
-            exp cat:= [ Random(random_exponent[1], random_exponent[2])
-                            : i in [#exp+1..#K`PrimeIdeals[p]] ];
-        end if;
-        explist[i] := exp;
-        if #[ e : e in exp | e ne 0 ] gt 0 then
-            force_include := true;
-        else
-            force_include := noskip;
-        end if;
+		Montes(K, p);
 
-        if (K`LocalIndex[p] gt 0) or (force_include eq true) then
-            times := K`Times;
-            K`Times := [ ];
-            sfl_count := K`SFLCount;
-            print "(SIntegralBasisMaxMin) exp:", exp;
-            p_basis, nums, dexp := pBasisTriangular(K, p : exp:=exp);
-            K`Times := SumTimes(K`Times, times);
-            K`SFLCount +:= sfl_count;
-            if p eq 19 then
-                print "(SIntegralBasisMaxMin) 19-basis:", p_basis;
+        if K`LocalIndex[p] gt 0 then
+            nums, dexp, pexp := pBasis(I, p : Separated:=true);
+            factor *:= K!p^pexp;
+
+            dens := [ BaseField(K)!p^e : e in dexp ];
+            p_factors := [ fac : fac in I`Factorization | fac[1] eq p ];
+            if #p_factors gt 0 then
+                alpha := Maximum([ Ceiling(fac[3]/K`PrimeIdeals[p,fac[2]]`e)
+                                                : fac in p_factors ]);
+            else
+                alpha := 0;
             end if;
-
-            dens := [ Rationals() | p^e : e in dexp ];
-            alpha := Maximum([ Ceiling(exp[i]/K`PrimeIdeals[p,i]`e)
-                                    : i in [1..#exp] ]);
             dens_crt := [ p^(Maximum(alpha, 0)+Maximum(e+1, 0)) : e in dexp ];
 
             Append(~Numlist, [ Coefficients(g) : g in nums ]);
@@ -3667,7 +3262,6 @@ intrinsic SIntegralBasisMaxMin(K::FldNum, primelist::SeqEnum, explist::SeqEnum :
         return [K.1^k: k in [0..n-1]];
     end if;
 
-    tmps := Cputime();
     SBasis := [ K | ];
 
     for i := 1 to n do
@@ -3681,113 +3275,55 @@ intrinsic SIntegralBasisMaxMin(K::FldNum, primelist::SeqEnum, explist::SeqEnum :
         coeffs cat:= [0: j in [1..n-#coeffs]];
         Append(~SBasis, (K.1^(i-1)+K!coeffs)/&*Dens);
     end for;
-    Append(~K`Times, Cputime() - tmps);
 
-    return SBasis, explist;
-end intrinsic; // SIntegralBasisMaxMin
+    return SBasis, factor;
+end intrinsic; // SIdealBasis
 
 
-intrinsic IntegralBasisMaxMin(K::FldNum)->SeqEnum
-    { Compute a basis of the maximal order Z_K of K and the discriminant of K. }
-
-    if not assigned K`IntegralBasis then
-        if not assigned K`Discriminant then
-            K`Discriminant := Discriminant(DefiningPolynomial(K));
-        end if;
-        d := K`Discriminant;
-
-        if not assigned K`FactorizedDiscriminant then
-            printf "Discriminant is a %o bit number, factoring...\n",
-                Ceiling(Log(2, Abs(d)));
-            sq_d := Integers()!(d / SquareFreeFactorization(d));
-            primelist := PrimeDivisors(sq_d);
-
-            d_fac := [ [p, Valuation(sq_d, p)] : p in primelist ];
-        else
-            primelist := [ factor[1] : factor in K`FactorizedDiscriminant ];
-            d_fac := [ [p, Valuation(d, p)] : p in primelist ];
-        end if;
-
-        print primelist;
-
-        empty_exp := [ [] : p in primelist ];
-        K`IntegralBasis := SIntegralBasisMaxMin(K, primelist, empty_exp);
-
-        // FIXME: Do I really need to assign this to anything other than
-        //        what I already have in d_fac?
-        K`FactorizedDiscriminant := [];
-        for p in primelist do
-            d := d div p^(2*K`LocalIndex[p]);
-            Append(~K`FactorizedDiscriminant, [p, Valuation(d, p)]);
-        end for;
-    end if;
-
-    return K`IntegralBasis;
-end intrinsic; // IntegralBasisMaxMin
-
-intrinsic idealBasis(I::Rec)-> SeqEnum
+intrinsic HermiteFormBasis(K::FldNum, p::RngIntElt, nums::SeqEnum, dexp::SeqEnum)-> SeqEnum
     { }
 
-    K := I`Parent;
+    n := Degree(K);
+    maxexp := dexp[n];
+    p_max := p^maxexp;
+    Nums := [ [ Coefficient(nums[i], j) * p^(maxexp-dexp[i])
+                :  j in [n-1..0 by -1] ]
+                    : i in [n..1 by -1] ];
 
-    if not assigned I`Factorization then
-        Factorization(~I);
-    end if;
+    Zp := pAdicRing(p, maxexp+1);
+    pi := UniformizingElement(Zp);
+    matrix_red := Matrix(Zp, Nums);
+    hnf_matrix := HermiteForm(matrix_red);
 
-    if not assigned K`Discriminant then
-        K`Discriminant := Discriminant(DefiningPolynomial(K));
-    end if;
-    d := K`Discriminant;
+    hnf_basis := Reverse([ K!Reverse(Eltseq(hnf_matrix[i]))/p_max :
+                                i in [1..n] ]);
 
-    if not assigned K`FactorizedDiscriminant then
-        printf "Discriminant is a %o bit number, factorising...\n",
-            Ceiling(Log(2, Abs(d)));
-        primelist := PrimeDivisors(d);
+    return hnf_basis; 
+end intrinsic; // HermiteFormBasis
 
-        d_fac := [ [p, Valuation(d, p)] : p in primelist ];
-    else
-        primelist := [ factor[1] : factor in K`FactorizedDiscriminant ];
-        d_fac := [ [p, Valuation(d, p)] : p in primelist ];
-    end if;
+intrinsic HermiteFormBasis(K::FldNum, basis::SeqEnum)-> SeqEnum
+    { We assume that the (global) basis is triangular. }
 
-    primelist := [ p : p in { f[1] : f in I`Factorization }
-                            join Set(primelist) ];
+    n := #basis;
+    kt := PolynomialRing(ConstantField(K));
+    dens := [ Denominator(g) : g in Reverse(basis) ];
+    maxden := dens[1];
 
-    exp := [ [] : p in primelist ];
-    for f in I`Factorization do
-        p_ind := Index(primelist, f[1]);
-        if #exp[p_ind] lt f[2] then
-            // Make exp[p] long enough to fit P_f[2].
-            exp[p_ind] cat:= [ 0 : i in [#exp[p_ind]+1..f[2]] ];
-        end if;
-        exp[p_ind,f[2]] := f[3];
-    end for;
+    int_basis := [ g*maxden : g in Reverse(basis) ];
+    A := Matrix(kt, [ Reverse(Eltseq(g*maxden, BaseField(K)))
+                        : g in Reverse(basis) ]);
 
-    basis := SIntegralBasisMaxMin(I`Parent, primelist, exp);
+    H := HermiteForm(A);
 
-    return basis;
-end intrinsic; // idealBasis
+    hnf_basis := [ K!Reverse(Eltseq(H[i]))/maxden : i in [n..1 by -1] ];
 
-intrinsic pIdealBasis(K::FldNum, p::RngIntElt, exp::SeqEnum)-> SeqEnum
-    { Returns a p-basis of a fractional ideal constructed from the product
-      of the prime ideals P_i lying over p with exponent e_i. }
-
-    if not assigned(K`PrimeIdeals) or not IsDefined(K`PrimeIdeals, p) then
-        _, _ := Montes(K, p : Basis:=false);
-    end if;
-
-    // This allows us to only specify up to the highest indexed prime
-    // ideal with non-zero exponent.
-    if #K`PrimeIdeals[p] gt #exp then
-        exp cat:= [ 0 : i in [#exp+1..#K`PrimeIdeals[p]] ];
-    end if;
-
-    basis := MaxMin(K, p : exponents:=exp);
-
-    return basis;
-end intrinsic; // pIdealBasis
+    return hnf_basis;
+end intrinsic; // HermiteFormBasis
 
 
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+// MaxMin
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -3810,7 +3346,6 @@ intrinsic MaxMinCore(okbasis_values::SeqEnum, modifiers::SeqEnum)-> SeqEnum, Seq
 
     s := #okbasis_values;
     J := [ 1 : i in [1..s] ];
-    S := [ -modifiers[i] : i in [1..s] ];
     nps := [ #okbasis_values[i]-1 : i in [1..s] ];
     n := &+[ np : np in nps ];
 
@@ -3818,10 +3353,9 @@ intrinsic MaxMinCore(okbasis_values::SeqEnum, modifiers::SeqEnum)-> SeqEnum, Seq
     req_approx_values := [* 0 : i in [1..s] *];
 
     for m := 0 to n do
-//        S1 := [ &+[ okbasis_values[k,J[k],i]
-//                    : k in [1..s] ] - modifiers[i]
-//                        : i in [1..s] ];
-//        printf "%o) equal? %o\n", m, S eq S1;
+        S := [ &+[ okbasis_values[k,J[k],i]
+                    : k in [1..s] ] - modifiers[i]
+                        : i in [1..s] ];
         v, u := Min([ S[i] + approx_values[i] : i in [1..s] ]);
 
         Append(~den_exp, S[u]);
@@ -3840,10 +3374,6 @@ intrinsic MaxMinCore(okbasis_values::SeqEnum, modifiers::SeqEnum)-> SeqEnum, Seq
         end if;
 
         J[u] +:= 1;
-        if m ne n then
-            S := [ S[i] - okbasis_values[u,J[u]-1,i] + okbasis_values[u,J[u],i]
-                        : i in [1..s] ];
-        end if;
         if J[u] gt nps[u] then
             approx_values[u] := Infinity();
         end if;
@@ -3879,7 +3409,6 @@ intrinsic MaxMin(K::FldNum, p::RngIntElt : exponents:=false)-> SeqEnum, SeqEnum,
             
 
     // Call MaxMin Core.
-    core_time := Cputime();
     indices, den_exp, values, req_approx_values := MaxMinCore(bases_values,
                                                               modifiers);
 
@@ -3893,9 +3422,12 @@ intrinsic MaxMin(K::FldNum, p::RngIntElt : exponents:=false)-> SeqEnum, SeqEnum,
     if #ok_frames eq 1 then
         basis := computeOkutsuBasis(ok_frames[1]);
     else
-        basis := computeLocalBasis(indices, bases_indices, ok_frames);
+        mod_exponents := reductionExponents(den_exp[1..#den_exp-1], modifiers);
+        basis := computeLocalBasis(indices, bases_indices, ok_frames,
+                                   p^mod_exponents[#mod_exponents]);
     end if;
 
+    // Remove the degree n element so we have a non-extended basis.
     basis := basis[1..#basis-1];
     den_exp := den_exp[1..#den_exp-1];
 
@@ -3905,13 +3437,9 @@ intrinsic MaxMin(K::FldNum, p::RngIntElt : exponents:=false)-> SeqEnum, SeqEnum,
     den_exp := [ Floor(v) : v in den_exp ];
 
     p_basis := [ (K![ Coefficient(basis[i], j)
-                    : j in [0..#basis-1] ])/p^den_exp[i]
+                    : j in [0..#basis-1] ])/K!p^den_exp[i]
                         : i in [#basis..1 by -1] ];
 
-    K`Times cat:= [ sfl_time - maxmin_time,
-                    polmul_time - sfl_time,
-                    reduce_time - polmul_time,
-                    Cputime() - reduce_time ];
 
     return Reverse(p_basis), basis, den_exp;
 end intrinsic; // MaxMin
@@ -3937,14 +3465,10 @@ intrinsic liftMontesApproximations(~types::SeqEnum[Rec], req_phip_vals::List : r
             last_lvl := types[ri]`Type[#types[ri]`Type];
             h := last_lvl`h - last_lvl`cuttingslope;
             lasth := Ceiling(required_slope) - last_lvl`cuttingslope;
-            path:=PathOfPrecisions(lasth,h);
+            path := PathOfPrecisions(lasth,h);
 
-            SFL(~types[ri]`Type, Ceiling(required_slope));
-
-            if #path gt 0 then
-                types[ri]`Parent`SFLCount +:= (#path - 1);
-            end if;
-
+            SFL(~types[ri], Ceiling(required_slope));
+            
         end if;
     end for;
 
@@ -4173,7 +3697,7 @@ end intrinsic; // calculateBasisIndices
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
-intrinsic computeLocalBasis(lb_indices, bases_indices, frames)-> List
+intrinsic computeLocalBasis(lb_indices, bases_indices, frames, pprec)-> List
     { Efficiently compute a local basis given the indices of which element
       from each $\P$-basis is used to make up an element of the final basis.
 
@@ -4202,10 +3726,6 @@ intrinsic computeLocalBasis(lb_indices, bases_indices, frames)-> List
             not_i := [1..i-1] cat [i+1..s];
             if &+[ lb_indices[m,j]-lb_indices[m-ch_deg,j] : j in not_i ] eq 0 then
                 basis_el := local_basis[m-ch_deg] * frames[i,u]`polynomial;
-            elif s ge 10 then
-                computeOkutsuBasisElement(~f_bases[i], frames[i],
-                                          bases_indices[i], lb_indices[m,i]-1);
-                basis_el := (local_basis[m-1] div f_bases[i,lb_indices[m,i]-1]) * frames[i,u]`polynomial;
             else
                 basis_el := 1;
                 for i in [1..#bases_indices] do
@@ -4217,6 +3737,10 @@ intrinsic computeLocalBasis(lb_indices, bases_indices, frames)-> List
             end if;
         end if;
 
+        // We reduce each element mod p^prec where prec is the maximum
+        // precision required by the basis. This keeps the precision reasonably
+        // low.
+        basis_el := basis_el mod pprec;
         Append(~local_basis, basis_el);
     end for;
 
@@ -4258,6 +3782,14 @@ intrinsic basisFromMatrix(matrix::Mtrx, basis_values, K::FldNum, p::RngIntElt)->
     return [ K![matrix[i,j] : j in [n..1 by -1]]/p^basis_values[n+1-i] : i in [n..1 by -1] ];
 end intrinsic; // basisFromMatrix
 
+intrinsic reductionExponents(dexp::SeqEnum, modifiers::SeqEnum)-> SeqEnum
+    { Calculate the exponents for reduction modulo p^nu. }
+
+    max_modifier := Maximum(modifiers);
+    mod_exponents := [ Maximum(Ceiling(v + max_modifier), 0)+1 : v in dexp ];
+
+    return mod_exponents;
+end intrinsic; // reductionExponents
 
 intrinsic reducepBasis(~nums::SeqEnum, dexp::SeqEnum, modifiers::SeqEnum, p::RngIntElt)
     { Reduce all basis numerators mod their valuation. }
@@ -4265,39 +3797,33 @@ intrinsic reducepBasis(~nums::SeqEnum, dexp::SeqEnum, modifiers::SeqEnum, p::Rng
     // We can reduce each basis element g modulo p^(w_I(g + max))
     max_modifier := Maximum(modifiers);
     mod_exponents := [ Maximum(Ceiling(v + max_modifier), 0)+1 : v in dexp ];
+//    printf "\n(reducepBasis) mod_exponents: %o\n", mod_exponents;
+    mods := [ p^mod_exponents[1] ];
+    prime_cache := AssociativeArray();
+    for i in [2..#mod_exponents] do
+        delta := mod_exponents[i] - mod_exponents[i-1];
+        j := Index(mod_exponents, delta);
+        if j gt 0 then
+            delta_power := mods[j];
+        elif IsDefined(prime_cache, j) then
+            delta_power := prime_cache[j];
+        else
+            delta_power := p^j;
+            prime_cache[j] := delta_power;
+        end if;
+        
+        Append(~mods, mods[i-1] * delta_power);
+    end for;
 
+    tmps := Cputime();
     n := #nums;
+    Ox := Parent(nums[1]);
     for i in [1..n] do
-        nums[i] := nums[i] mod p^mod_exponents[i];
+        coeffs := Parent([p]) ! Eltseq(nums[i]);
+        nums[i] := Ox ! [ coeffs[j] mod mods[i] : j in [1..#coeffs] ];
     end for;
 
 end intrinsic; // reducepBasis
-
-
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-//      Utility functions
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-
-
-intrinsic HermiteFormTriangularSimple(A::Mtrx)-> Mtrx
-    { Compute the Hermite Normal Form of a square triangular matrix. }
-
-    require Nrows(A) eq Ncols(A): "A must be a square matrix.";
-    n := Nrows(A);
-
-    rows_times := [];
-
-    for i in [2..n] do
-        for j in [i-1..1 by -1] do
-            v := A[j,i] div A[i,i];
-            AddRow(~A, -v, i, j);
-        end for;
-    end for;
-
-    return A; 
-end intrinsic;
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -4321,1094 +3847,3 @@ intrinsic itertoolsProduct(pools)-> List
 end intrinsic;
 
 
-
-
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-////////////////////pBasis with multipliers/////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-
-intrinsic IndEx(K::FldNum)-> SeqEnum, SeqEnum
-    { Filler intrinsic. }
-
-    print "******** WARNING ********";
-    print "Intrinsic IndEx() for Number Fields is a placeholder.";
-
-    return [], [];
-end intrinsic;
-
-intrinsic SIdealBaseDirect(I::Rec, primes::SeqEnum)-> SeqEnum
-    { Filler intrinsic. }
-
-    print "******** WARNING ********";
-    print "Intrinsic SIdealBaseDirect() for Number Fields is a placeholder.";
-
-    return [];
-end intrinsic;
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-intrinsic pBasisRR(I::Rec,p::RngIntElt:Reduced:=false)->SeqEnum
-{Computes a p-integral basis of the fractional ideal in Hermite Form or if Reduced is set true an p-orthonormal basis of I}
-
-//Initialization
-Factorization(~I);
-F:=I`Parent;	n:=Degree(F);
-Primes:=F`PrimeIdeals[p];
-s:=#Primes;
-//Ramifications indices
-kt:=Integers();	kx<x>:=PolynomialRing(kt); K:=BaseField(F);
-_, _ := Montes(F,p);
-//SAVEDATA:=F`PrimeIdeals[p];
-//tts:=Realtime();
-
-
-//Initializing Exponentes of p-part of ideal
-Expos:=[0:i in [1..#F`PrimeIdeals[p]]];
-for i in I`Factorization do
-	if i[1] eq p then 	
-		Expos[i[2]]:=i[3];	
-	end if;
-end for;
-
-
-//Ziehe groessten p(t)^a*O_F aus I heraus und speicher p(t)^a 
-killexpo:=0;
-if forall{i:i in [1..s]|Expos[i] gt 0 } then
-	killexpo:=Minimum([Floor(Expos[ll]/Primes[ll]`e):ll in [1..s]]);
-	Expos:=[Expos[ll]-Primes[ll]`e*killexpo:ll in [1..s]];
-end if;
-if forall{i:i in [1..s]|Expos[i] lt 0 } then
-	killexpo:=Maximum([Ceiling(Expos[ll]/Primes[ll]`e):ll in [1..s]]);
-	Expos:=[Expos[ll]-Primes[ll]`e*killexpo:ll in [1..s]];
-end if;
-//Wenn 
-if IsDefined(F`LocalIndex,p) and Expos eq [0:i in [1..s]] then
-	if F`LocalIndex[p] eq 0 then
-		return [F.1^i:i in [0..n-1]],[0:i in [0..n-1]],kt!1,1,p,killexpo ;
-	end if;
-end if;
-
-/*if p in F`Index and assigned F`IndexBases and IsDefined(F`IndexBases,p) and Expos eq [0:i in [1..s]] then
-
-	return F`IndexBases[p,1],F`IndexBases[p,2],F`IndexBases[p,3],F`IndexBases[p,4],F`IndexBases[p,5],killexpo;
-
-end if;*/
-
-
-//Construction of Okutsu bases: 
-//if not IsDefined(F`localbasedata,p) then
-	LocalBases:=[];
-	VallMatrix:=[];
-	PhiValMatrix:=[];
-	for i in [1..s] do 
-		r:=#Primes[i]`Type;		e_P:=Primes[i]`e;	n_P:=e_P*Primes[i]`f;    a_P:=Expos[i];         
-		Phis:= [Primes[i]`Type[j]`Phi:j in [1..r]];
-		PhiDeg:=[Degree(j):j in Phis];
-		PhiExpos:=[PhiExpo(m,PhiDeg):m in [1..n_P-1]];
-		Phis:=[x] cat Phis;
-		BasisVals:=[* *];
-		PhiVals:=[* *];
-		for l in [1..s] do 
-			BasisValstmp:=[Rationals()!0:i in [1..n_P]];
-			PhiValstmp:=[PhiValuation(F,p,[i,o],l):o in [0..#Primes[i]`Type] ];
-			for k in [1..n_P-1] do
-				BasisValstmp[k+1]:=&+[PhiExpos[k,ll]*PhiValstmp[ll]:ll in [1..#PhiExpos[k] ]];
-			end for;
-			Append(~BasisVals,BasisValstmp);
-			Append(~PhiVals,PhiValstmp);
-		end for;
-		Append(~PhiValMatrix,PhiVals);
-		Append(~VallMatrix,BasisVals);
-		localBasis:=[kx!1] cat [ kx!&*[Phis[j]^PhiExpos[k][j]:j in [1..#Phis-1]]:k in [1..n_P-1]];
-		Append(~LocalBases,localBasis);
-	end for;
-
-//	F`localbasedata[p]:=[*LocalBases,VallMatrix,PhiValMatrix*];
-/*else
-	LocalBases:=F`localbasedata[p][1];
-	VallMatrix:=F`localbasedata[p][2];
-	PhiValMatrix:=F`localbasedata[p][3];
-end if;*/
-
-FacIndex,Facprecision,DenExpos,NormValues:=Multipliers2(F,p,Expos,PhiValMatrix,VallMatrix,Reduced);
-//print"Step 2 Multi",Realtime()-tts;tts:=Realtime();
-//tt:=F`PrimeIdeals[p];
-alpha:=Maximum([Ceiling(Expos[j]/Primes[j]`e):j in [1..s]])+1;
-//print"alpha",alpha;
-//ModExp:=Maximum(&cat [[Integers()!Abs(j):j  in i]:i in DenExpos])+alpha;
-//print"ModExp",ModExp;
-Base:=[];
-//pevModExp2:=p^(ModExp);
-groupedNormValues:=NormValues;
-NormValues:=&cat NormValues;
-
-_,Possi:=Maximum(NormValues);
-constminus:=Minimum([-Expos[j]/Primes[j]`e:j in [1..#Expos]]);
-modalphas:=[[Maximum([Ceiling(ll-constminus),0])+1:ll in j]:j in groupedNormValues];
-//print"NormValues",modalphas;
-Multis,Indices,exportexpos:=ComputMultisShort(F,p,FacIndex,Facprecision,PhiValMatrix,modalphas);
-//print"Step 3 Compute Multis",Realtime()-tts;tts:=Realtime();
-//print"for p=",p;
-//print"\n";
-pmodExpos:=ProdList([Maximum([Ceiling(j),0])+1:j in NormValues],p);
-pevModExp:=exportexpos[Possi];
-_,maxindex:=Maximum(NormValues);
-//print"Maximaler Exponent",Maximum(NormValues);
-//pevModExp:=pmodExpos[maxindex];
-//print"expos...", pevModExp,pmodExpos;
-lauf:=1;
-for i in [1..#LocalBases] do
-	for j in [1..#LocalBases[i]] do 
-		print"exportexpos[lauf])",(LocalBases[i,j]* Multis[i])mod exportexpos[lauf];
-		Append(~Base,Eval(F,(LocalBases[i,j]* Multis[i])mod exportexpos[lauf]) );//pmodExpos[lauf]
-		lauf:=lauf+1;	
-	end for;
-end for;
-//print"Step 4 Multiplying to basis",Realtime()-tts;tts:=Realtime();
-//Degree(pevModExp),[Degree(i):i in exportexpos];
-//Again reduction of Coefficiants
-DenExpos:=&cat DenExpos;
-modalphasList:=&cat modalphas;
-for i in [1..n] do
-	TMP:=Parent([p])!Eltseq(Base[i]);
-	Base[i]:=F![TMP[j] mod exportexpos[i]: j in [1..#TMP]];
-end for;
-
-//////////////Transforming into HNF////////////////////
-//print"DenExpos",DenExpos;
-denexxo:=Sort(DenExpos);
-zeta:=-Maximum(DenExpos);
-DenExpos:=[-i-zeta:i in DenExpos];
-//print"DenExpos",DenExpos;
-//print"Step 7",Realtime()-tts;
-PreBase:=Reverse(Sort([p^DenExpos[i]*Base[i]:i in [1..#Base]],func<x, y | Deg(x) - Deg(y)>));
-//print"Daten",[p^DenExpos[i]*Base[i]:i in [1..#Base]],DenExpos;
-MatList:=[];
-//print"Step 7",[Deg(i):i in PreBase];Realtime()-tts;
-for j:=1 to #PreBase by  1 do
-	Append(~MatList,Reverse(Parent([p])!Eltseq(PreBase[j])));
-end for;
-//print"Step 5 Gleich HNF",Realtime()-tts;tts:=Realtime();
-if Reduced eq false then
-		H:=HermiteForm(Matrix(MatList));
-//print"Step 9 just HNF",Realtime()-tts;tts:=Realtime();
-	MatList:=[Eltseq(H[i]):i in [1..n]];
-	Denoms:=[];
-	for i in [1..n] do
-		exp:=Valuation(MatList[i,i],p);	
-		Append(~Denoms,exp);
-		pevExp:=p^exp;
-		inv:=Modinv(Parent(p)!(MatList[i,i]/pevExp),pevModExp);
-		MatList[i,i]:=pevExp;
-		for j in [i+1..n] do
-			MatList[i,j]:=(MatList[i,j]*inv) mod pevModExp;
-		end for;	
-	end for;
-	Denoms:=[-(i+zeta):i in Denoms];
-	H:=HermiteForm(Matrix(MatList));
-//print"Step 10 IN HNF",Realtime()-tts;tts:=Realtime();
-	Base:=Reverse([(F!  Parent([p])!Reverse(Eltseq(H[i]))) *K!p^zeta:i in [1..Degree(F)]]);
-else
-	Posi:=Signature(NormValues,[i`e:i in F`PrimeIdeals[p]]);
-// HNF fÃ¼r reduzierte Basis
-	for j in [1..#Posi] do
-		tmpList:=[MatList[i]: i in Posi[j]];		
-		H:=HermiteForm(Matrix(tmpList));
-		tmpList:=[Parent([p])!Eltseq(H[i]):i in [1..#tmpList]];
-		for i in [1..#tmpList] do
-			MatList[Posi[j,i]]:=tmpList[i];			
-		end for;
-	end for;
-// Normalisieren der Basis
-	for i in [1..n] do
-		nN:=exists(ind){ y : y in [1..n] | not MatList[i,y] eq 0};
-		exp:=Valuation(MatList[i,ind],p);
-		pevExp:=p^exp;
-		inv:=Modinv(Parent(p)!(MatList[i,ind]/pevExp),pevModExp);
-		MatList[i,ind]:=pevExp;
-		for j in [ind+1..n] do
-			MatList[i,j]:=(MatList[i,j]*inv) mod pevModExp;
-		end for;	
-	end for;	
-
-//		print"was",Realtime()-tts;tts:=Realtime();
-
-// HNF fÃ¼r reduzierte Basis zum 2.
-	for j in [1..#Posi] do
-
-		tmpList:=[MatList[i]: i in Posi[j]];		
-		H:=HermiteForm(Matrix(tmpList));
-		tmpList:=[Parent([p])!Eltseq(H[i]):i in [1..#tmpList]];
-		for i in [1..#tmpList] do
-			MatList[Posi[j,i]]:=tmpList[i];			
-		end for;		
-	end for;
-	//					print"drin?",Realtime()-tts;tts:=Realtime();
-	Base:=Sort(Reverse([F!  Parent([p])!Reverse(Eltseq(MatList[i])) *K!p^zeta:i in [1..Degree(F)]]),func<x, y | Deg(x) - Deg(y)>);
-//	F`PrimeIdeals[p]:=SAVEDATA;// IST NEU
-	return Base,[],0,kt!1,p,killexpo;
-end if;
-
-
-/*if p in F`Index and assigned F`IndexBases and not IsDefined(F`IndexBases,p) and Expos eq [0:i in [1..s]] then
-	F`IndexBases[p]:=[*Base,Sort(Denoms),pevModExp,alpha,p,killexpo*];
-end if;*/
-
-/*if Expos eq [0:i in Expos] and not IsDefined(F`maxorderfinite,p) then
-	F`maxorderfinite[p]:=[*Base,Sort(Denoms),pevModExp,alpha*];
-end if;*/
-
-//F`PrimeIdeals[p]:=SAVEDATA;
-//print"Step Raus",Realtime()-tts;tts:=Realtime();
-return Base,Sort(Denoms),pevModExp,alpha,p,killexpo;
-end intrinsic;
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-
-intrinsic pBasisMultipliers(I::Rec,p::RngIntElt:HNF:=false, exp:=false, random_exponent:=[0, 0])->SeqEnum
-{Computes a p-integral basis of the fractional ideal in Hermite Form}
-
-//Initialization
-
-F:=I`Parent;
-n:=Degree(F);
-
-if not assigned(F`PrimeIdeals) or not IsDefined(F`PrimeIdeals, p) then
-    _, _ := Montes(F, p : Basis:=false);
-end if;
-
-// Yes, this is a bit hackish, but it'll do for now.
-if Type(exp) ne BoolElt then
-    if #F`PrimeIdeals[p] gt #exp then
-        exp cat:= [ Random(random_exponent[1], random_exponent[2])
-                        : i in [#exp+1..#F`PrimeIdeals[p]] ];
-    end if;
-    I := &*[ F`PrimeIdeals[p,i]^exp[i] : i in [1..#exp] ];
-end if;
-
-exponents_time := Cputime();
-
-Factorization(~I);
-
-Primes:=F`PrimeIdeals[p];
-s:=#Primes;
-//Ramifications indices
-kt:=Integers();	kx<x>:=PolynomialRing(kt); K:=BaseField(F);
-//Montes(F,p);
-//SAVEDATA:=F`PrimeIdeals[p];
-//tts:=Realtime();
-
-
-//Initializing Exponentes of p-part of ideal
-Expos:=[0:i in [1..#F`PrimeIdeals[p]]];
-for i in I`Factorization do
-	if i[1] eq p then 	
-		Expos[i[2]]:=i[3];	
-	end if;
-end for;
-
-
-//Ziehe groessten p(t)^a*O_F aus I heraus und speicher p(t)^a 
-killexpo:=0;
-if forall{i:i in [1..s]|Expos[i] gt 0 } then
-	killexpo:=Minimum([Floor(Expos[ll]/Primes[ll]`e):ll in [1..s]]);
-	Expos:=[Expos[ll]-Primes[ll]`e*killexpo:ll in [1..s]];
-end if;
-if forall{i:i in [1..s]|Expos[i] lt 0 } then
-	killexpo:=Maximum([Ceiling(Expos[ll]/Primes[ll]`e):ll in [1..s]]);
-	Expos:=[Expos[ll]-Primes[ll]`e*killexpo:ll in [1..s]];
-end if;
-//Wenn 
-if IsDefined(F`LocalIndex,p) and Expos eq [0:i in [1..s]] then
-	if F`LocalIndex[p] eq 0 then
-        p_basis := [ F.1^i : i in [0..n-1] ];
-        nums := [ kx!Eltseq(c) : c in p_basis ];
-        dexp := [ 0 : i in [0..n-1] ];
-
-        F`Times cat:= [ Cputime() - exponents_time ];
-
-        return p_basis, nums, dexp, exp;
-        // Substituted for the above by Hayden.
-		//return [F.1^i:i in [0..n-1]],[0:i in [0..n-1]],kt!1,1,p,killexpo ;
-	end if;
-end if;
-
-/*if p in F`Index and assigned F`IndexBases and IsDefined(F`IndexBases,p) and Expos eq [0:i in [1..s]] then
-
-	return F`IndexBases[p,1],F`IndexBases[p,2],F`IndexBases[p,3],F`IndexBases[p,4],F`IndexBases[p,5],killexpo;
-
-end if;*/
-
-
-okbasis_time := Cputime();
-
-//Construction of Okutsu bases: 
-//if not IsDefined(F`localbasedata,p) then
-	LocalBases:=[];
-	VallMatrix:=[];
-	PhiValMatrix:=[];
-	for i in [1..s] do 
-		r:=#Primes[i]`Type;		e_P:=Primes[i]`e;	n_P:=e_P*Primes[i]`f;    a_P:=Expos[i];         
-		Phis:= [Primes[i]`Type[j]`Phi:j in [1..r]];
-		PhiDeg:=[Degree(j):j in Phis];
-		PhiExpos:=[PhiExpo(m,PhiDeg):m in [1..n_P-1]];
-		Phis:=[x] cat Phis;
-		BasisVals:=[* *];
-		PhiVals:=[* *];
-		for l in [1..s] do 
-			BasisValstmp:=[Rationals()!0:i in [1..n_P]];
-			PhiValstmp:=[PhiValuation(F,p,[i,o],l):o in [0..#Primes[i]`Type] ];
-			for k in [1..n_P-1] do
-				BasisValstmp[k+1]:=&+[PhiExpos[k,ll]*PhiValstmp[ll]:ll in [1..#PhiExpos[k] ]];
-			end for;
-			Append(~BasisVals,BasisValstmp);
-			Append(~PhiVals,PhiValstmp);
-		end for;
-		Append(~PhiValMatrix,PhiVals);
-		Append(~VallMatrix,BasisVals);
-		localBasis:=[kx!1] cat [ kx!&*[Phis[j]^PhiExpos[k][j]:j in [1..#Phis-1]]:k in [1..n_P-1]];
-		Append(~LocalBases,localBasis);
-	end for;
-
-//	F`localbasedata[p]:=[*LocalBases,VallMatrix,PhiValMatrix*];
-/*else
-	LocalBases:=F`localbasedata[p][1];
-	VallMatrix:=F`localbasedata[p][2];
-	PhiValMatrix:=F`localbasedata[p][3];
-end if;*/
-
-multipliers_time := Cputime();
-
-FacIndex,Facprecision,DenExpos,NormValues:=Multipliers2(F,p,Expos,PhiValMatrix,VallMatrix,false);
-
-//print"Step 2 Multi",Realtime()-tts;tts:=Realtime();
-//tt:=F`PrimeIdeals[p];
-alpha:=Maximum([Ceiling(Expos[j]/Primes[j]`e):j in [1..s]])+1;
-//print"alpha",alpha;
-//ModExp:=Maximum(&cat [[Integers()!Abs(j):j  in i]:i in DenExpos])+alpha;
-//print"ModExp",ModExp;
-Base:=[];
-//pevModExp2:=p^(ModExp);
-groupedNormValues:=NormValues;
-NormValues:=&cat NormValues;
-
-_,Possi:=Maximum(NormValues);
-constminus:=Minimum([-Expos[j]/Primes[j]`e:j in [1..#Expos]]);
-modalphas:=[[Maximum([Ceiling(ll-constminus),0])+1:ll in j]:j in groupedNormValues];
-//print"NormValues",modalphas;
-Multis,Indices,exportexpos:=ComputMultisShort(F,p,FacIndex,Facprecision,PhiValMatrix,modalphas);
-
-mult_pol_time:= Cputime();
-
-//print"Step 3 Compute Multis",Realtime()-tts;tts:=Realtime();
-//print"for p=",p;
-//print"\n";
-//print"Indices",Indices;
-pmodExpos:=ProdList([Maximum([Ceiling(j),0])+1:j in NormValues],p);
-pevModExp:=exportexpos[Possi];
-_,maxindex:=Maximum(NormValues);
-//print"Maximaler Exponent",Maximum(NormValues);
-//pevModExp:=pmodExpos[maxindex];
-//print"expos...", pevModExp,pmodExpos;
-lauf:=1;
-for i in [1..#LocalBases] do
-	for j in [1..#LocalBases[i]] do 
-		Append(~Base,Eval(F,(LocalBases[i,j]* Multis[i])mod exportexpos[lauf]) );//pmodExpos[lauf]
-		lauf:=lauf+1;	
-	end for;
-end for;
-//print"Step 4 Multiplying to basis",Realtime()-tts;tts:=Realtime();
-//Degree(pevModExp),[Degree(i):i in exportexpos];
-//Again reduction of Coefficiants
-
-DenExpos:=&cat DenExpos;
-modalphasList:=&cat modalphas;
-for i in [1..n] do
-	TMP:=Parent([p])!Eltseq(Base[i]);
-	Base[i]:=F![TMP[j] mod exportexpos[i]: j in [1..#TMP]];
-end for;
-
-if HNF eq false then
-    nums := Base;
-    dexp := DenExpos;
-
-    unsorted_basis := [ [* nums[i], dexp[i] *] : i in [1..#nums] ];
-    sorted := Sort(unsorted_basis, func<x, y | Deg(x[1]) - Deg(y[1]) >);
-    nums := [ c[1] : c in sorted ];
-    dexp := [ c[2] : c in sorted ];
-    p_basis := [ nums[i]*K!p^-dexp[i] : i in [1..#nums] ];
-    nums := [ kx!Eltseq(c) : c in nums ];
-
-    F`Times cat:= [ okbasis_time - exponents_time,
-                    multipliers_time - okbasis_time,
-                    mult_pol_time - multipliers_time,
-                    Cputime() - mult_pol_time ];
-
-//    unsortedBasis:=[Base[i]*K!p^-DenExpos[i]:i in [1..#Base]];
-//    FinalpBasis:=Sort(unsortedBasis,func<x, y | Deg(x) - Deg(y)>);
-
-	return p_basis, nums, dexp, exp;
-end if;
-
-//////////////Transforming into HNF////////////////////
-//print"DenExpos",DenExpos;
-denexxo:=Sort(DenExpos);
-zeta:=-Maximum(DenExpos);
-DenExpos:=[-i-zeta:i in DenExpos];
-//print"DenExpos",DenExpos;
-//print"Step 7",Realtime()-tts;
-PreBase:=Reverse(Sort([p^DenExpos[i]*Base[i]:i in [1..#Base]],func<x, y | Deg(x) - Deg(y)>));
-//print"Daten",[p^DenExpos[i]*Base[i]:i in [1..#Base]],DenExpos;
-MatList:=[];
-//print"Step 7",[Deg(i):i in PreBase];Realtime()-tts;
-for j:=1 to #PreBase by  1 do
-	Append(~MatList,Reverse(Parent([p])!Eltseq(PreBase[j])));
-end for;
-//print"Step 5 Gleich HNF",Realtime()-tts;tts:=Realtime();
-		H:=HermiteForm(Matrix(MatList));
-//print"Step 9 just HNF",Realtime()-tts;tts:=Realtime();
-	MatList:=[Eltseq(H[i]):i in [1..n]];
-	Denoms:=[];
-	for i in [1..n] do
-		exp:=Valuation(MatList[i,i],p);	
-		Append(~Denoms,exp);
-		pevExp:=p^exp;
-		inv:=Modinv(Parent(p)!(MatList[i,i]/pevExp),pevModExp);
-		MatList[i,i]:=pevExp;
-		for j in [i+1..n] do
-			MatList[i,j]:=(MatList[i,j]*inv) mod pevModExp;
-		end for;	
-	end for;
-	Denoms:=[-(i+zeta):i in Denoms];
-	H:=HermiteForm(Matrix(MatList));
-//print"Step 10 IN HNF",Realtime()-tts;tts:=Realtime();
-	Base:=Reverse([(F!  Parent([p])!Reverse(Eltseq(H[i]))) *K!p^zeta:i in [1..Degree(F)]]);
-
-
-/*if Expos eq [0:i in Expos] and not IsDefined(F`maxorderfinite,p) then
-	F`maxorderfinite[p]:=[*Base,Sort(Denoms),pevModExp,alpha*];
-end if;*/
-
-//F`PrimeIdeals[p]:=SAVEDATA;
-//print"Step Raus",Realtime()-tts;tts:=Realtime();
-return Base,Sort(Denoms),pevModExp,alpha,p,killexpo;
-end intrinsic;
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-intrinsic Multipliers2(F::FldNum,p::RngIntElt,Expos:: SeqEnum, PhiVals::SeqEnum,BasisVals::SeqEnum,Reduced::BoolElt)->SeqEnum
-{Computes computes Multiplier}
-//print"Input daten :",BasisVals,PhiVals;
-s:=#PhiVals;
-FactorIndex:=[Remove([1..s],i):i in [1..s]];
-BasisNorm:=[[]:i in [1..s]];
-
-//Berechnung der Norm der Basis Elemente
-for l in [1..s] do
-	
-	for i in [1..s] do 
-		if #FactorIndex[l] gt 0 then
-		phiadjustment:=&+[PhiVals[j,i,#PhiVals[j,i]]:j in FactorIndex[l]];//- Expos[i]/F`PrimeIdeals[p,i]`e;
-		BasisNorm[l,i]:=[BasisVals[l,i,j]- Expos[i]/F`PrimeIdeals[p,i]`e +phiadjustment  :j  in [1..#BasisVals[l,1]]];
-		end if;
-	end for;
-end for;
-//print"BasisNorm",BasisNorm;
-
-
-
-PrecisionIndex:=[[]:i in [1..s]];
-
-for l in [1..s] do
-	
-	for i in Remove([1..s],l) do
-			phival_i_l:=PhiVals[i,l,#PhiVals[i,l]]; phival_i_i:=PhiVals[i,i,#PhiVals[i,i]];
-			ttmmpp:=[Floor( BasisNorm[l,l,rr]-phival_i_l) -Floor(BasisNorm[l,i,rr]-phival_i_i):rr in [1..#BasisVals[l,1]]];
-			m_0:=Maximum(ttmmpp);
-			val1:=m_0 ge 0 and i lt l; val2:=m_0 gt 0 and i gt l;
-			if Reduced then val2:=m_0 ge 0; end if;
-			if val1 or val2 then 
-				Append(~PrecisionIndex[l],i);
-				
-			else	
-
-				LL:=Remove([1..s],l);
-				
-				CheckList:=[1];
-				for j in Remove(LL,Position(LL,i)) do	// hier berechne ich was doppelt
-					ttmmpp2:=[Floor( BasisNorm[l,l,rr]-phival_i_l) -Floor(BasisNorm[l,j,rr]-PhiVals[j,i,#PhiVals[j,i]]):rr in [1..#BasisVals[l,1]]];
-					m:=Maximum(ttmmpp2);
-
-	
-					if  j lt l or Reduced then			
-				
-						if  m ge 0 then
-							
-							Append(~CheckList,0);
-							
-	
-						end if;
-					else
-			
-						if  m gt 0 then
-							Append(~CheckList,0);						
-						
-						end if;				
-				
-						
-					end if;
-			
-			
-				end for;	
-			
-			if &*CheckList eq 1 then
-					
-				FactorIndex[l]:=Remove(FactorIndex[l],Position(FactorIndex[l],i));
-				for z in [1..s] do
-					NormAdjusment:=PhiVals[i,z,#PhiVals[i,z]];
-//					NormAdjusment:=PhiVals[z,i,#PhiVals[z,i]];
-					for y in [1..#BasisNorm[l,1]] do
-						
-						BasisNorm[l,z,y]:=BasisNorm[l,z,y]-NormAdjusment;
-						
-					end for;
-					
-				end for;
-			
-			
-			//Alten Werte auch Ã¼berprÃ¼fen
-			
-			
-			
-			end if;
-			
-			end if;
-
-	end for;
-
-end for;
-
-//Nachbesserungen:
-//print"Old Index",FactorIndex;
-PrecisionIndex,FactorIndex:=MultiplierH([*F,p*],Expos, PhiVals,BasisNorm,FactorIndex,Reduced);
-//print"New Index",FactorIndex;
-
-
-//print"FactorIndex",FactorIndex;
-Precision:=[[0:j in [1..#FactorIndex[i]]]:i in [1..s]];
-//print"Precision",Precision;
-
-
-//Berechnung der SFL-Werte
-for l in [1..s] do 
-
-	if FactorIndex[l] ne [] then
-
-		Adj1:=&+[ PhiVals[j,l,#PhiVals[j,l]] :j in FactorIndex[l] ]- Expos[l]/F`PrimeIdeals[p,l]`e;
-		LSList:=[BasisVals[l,l,#BasisVals[l,1]]+ Adj1:rr in [1..#BasisVals[l,1]]];
-		//print"LS",LS,BasisVals[l,l,#BasisVals[l,1]],Adj1;
-		for i in  FactorIndex[l] do 
-			RSList:=[];
-			for mm in [1..#BasisVals[l,1]] do
-				iPosition:=Position(FactorIndex[l],i);
-				phiindices:=Remove(FactorIndex[l],iPosition);	
-
-				if #phiindices gt 0 then 
-			
-					Adj2:=&+[ PhiVals[j,i,#PhiVals[j,i]] :j in phiindices ]- Expos[i]/F`PrimeIdeals[p,i]`e;
-				else
-					Adj2:=- Expos[i]/F`PrimeIdeals[p,i]`e;
-				end if;	
-				//print"Adj2",&+[ PhiVals[j,i,#PhiVals[j,i]] :j in PrecisionIndex[l] ], Expos[i]/F`PrimeIdeals[p,i]`e;
-				Append(~RSList,BasisVals[l,i,mm]+ Adj2);
-				//print"BasisVals,l,i",BasisVals,l,i;
-				//print"Data",BasisVals[l,i,#BasisVals[l,1]],Adj2;		
-			end for;			
-			q:=Maximum([LSList[i]-RSList[i]:i in [1..#LSList]]);		
-			
-			//print"LS,RS",LS,RS;
-			prec:=Ceiling(q*F`PrimeIdeals[p,i]`e);
-			//print"prec",prec;
-			Boolval:=i lt l;
-			if Reduced then Boolval:=true; end if;
-			if Boolval and q ge 0 then 
-				Precision[l,Position(FactorIndex[l],i)]:=prec + F`PrimeIdeals[p,i]`e;
-			
-			end if;
-			
-			if l lt i and q gt 0  then
-
-				Precision[l,Position(FactorIndex[l],i)]:=prec ;				
-			
-			end if;	
-		
-		end for; 
-	
-	end if;
-	
-end for;
-
-DenExp:=[];
-NormVals:=[];
-//print"BasisVals",BasisVals;
-
-
-//Berechnung der Norm der Basiselemente
-for l in [1..s] do
-
-	DenExptmp:=[];
-	NormValstmp:=[];
-	for i in [1..#BasisVals[l,1]] do
-	
-		
-		
-		prec:=BasisVals[l,l,i]-Expos[l]/F`PrimeIdeals[p,l]`e;
-		
-		if FactorIndex[l] ne [] then
-		
-		Adj:=&+[PhiVals[ jj,l ,#PhiVals[jj,l] ] :jj in FactorIndex[l]];		
-				
-		Append(~DenExptmp, Floor(prec+Adj));
-		Append(~NormValstmp, prec+Adj);
-	else
-	
-		Append(~DenExptmp, Floor(prec));
-		Append(~NormValstmp, prec);
-		
-	end if;
-	
-	end for;
-	
-	Append(~DenExp,DenExptmp);
-	Append(~NormVals,NormValstmp);
-end for;		
-
-//print"DenExpoooos",DenExp;
-return FactorIndex,Precision,DenExp,NormVals,BasisNorm,PhiVals;
-end intrinsic;
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-
-intrinsic MultiplierH(Char::List,Expos:: SeqEnum, PhiVals::SeqEnum,BasisNorm::SeqEnum,FactorIndex::SeqEnum,Reduced::BoolElt)->SeqEnum
-{Computes computes Multiplier}
-//print"Input daten :",BasisVals,PhiVals;
-F:=Char[1];	p:=Char[2];
-s:=#PhiVals;
-//Berechnung der Norm der Basis Elemente
-
-
-
-
-PrecisionIndex:=[[]:i in [1..s]];
-
-for l in [1..s] do
-	
-	for i in Remove([1..s],l) do
-			phival_i_l:=PhiVals[i,l,#PhiVals[i,l]]; phival_i_i:=PhiVals[i,i,#PhiVals[i,i]];
-
-		//	phival_i_l:=PhiVals[l,i,#PhiVals[l,i]]; phival_i_i:=PhiVals[i,i,#PhiVals[i,i]];
-			ttmmpp:=[Floor( BasisNorm[l,l,rr]-phival_i_l) -Floor(BasisNorm[l,i,rr]-phival_i_i):rr in [1..#BasisNorm[l,1]]];
-			m_0:=Maximum(ttmmpp);
-			val1:=m_0 ge 0 and i lt l; val2:=m_0 gt 0 and i gt l;
-			if Reduced then val2:=m_0 ge 0; end if;
-			if val1 or val2 then 
-				Append(~PrecisionIndex[l],i);
-				
-			else	
-
-				LL:=Remove([1..s],l);
-				
-				CheckList:=[1];
-				for j in Remove(LL,Position(LL,i)) do	// hier berechne ich was doppelt
-					ttmmpp2:=[Floor( BasisNorm[l,l,rr]-phival_i_l) -Floor(BasisNorm[l,j,rr]-PhiVals[j,i,#PhiVals[j,i]]):rr in [1..#BasisNorm[l,1]]];
-					m:=Maximum(ttmmpp2);
-
-	
-					if  j lt l or Reduced then			
-				
-						if  m ge 0 then
-							
-							Append(~CheckList,0);
-							
-	
-						end if;
-					else
-			
-						if  m gt 0 then
-							Append(~CheckList,0);						
-						
-						end if;				
-				
-						
-					end if;
-
-				end for;	
-			
-			if &*CheckList eq 1 and i in FactorIndex[l] then
-					
-				FactorIndex[l]:=Remove(FactorIndex[l],Position(FactorIndex[l],i));
-					
-				for z in [1..s] do
-					NormAdjusment:=PhiVals[i,z,#PhiVals[i,z]];
-//					NormAdjusment:=PhiVals[z,i,#PhiVals[z,i]];
-					for y in [1..#BasisNorm[l,1]] do
-						
-						BasisNorm[l,z,y]:=BasisNorm[l,z,y]-NormAdjusment;
-						
-					end for;
-					
-				end for;
-			
-			
-			
-			//Alten Werte auch Ã¼berprÃ¼fen
-			
-			
-			
-			end if;
-			
-			end if;
-
-	end for;
-
-end for;
-//print"FactorIndex",FactorIndex;
-Precision:=[[0:j in [1..#FactorIndex[i]]]:i in [1..s]];
-//print"Precision",Precision;
-
-
-return PrecisionIndex,FactorIndex;
-end intrinsic;
-
-
-
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-intrinsic ComputMultisShort(F::FldNum,p::RngIntElt,FacIndex:: SeqEnum, Facprecision::SeqEnum,PhiVals::SeqEnum,modalphas::SeqEnum)->SeqEnum
-{Determines Multipliers}
-
-//print"FacIndex",FacIndex,Facprecision;
-s:=#FacIndex;
-ModExponents:=[];
-ModExpList:=[];
-for i in [1..s] do
-
-	if Facprecision[i] eq [] then
-		Append(~ModExponents,1);
-	else
-		for l in [1..#FacIndex[i]] do
-		phivalues:=[Facprecision[i,l]/F`PrimeIdeals[p,FacIndex[i,l]]`e] cat [PhiVals[l,j,#PhiVals[l,1]]: j in Remove([1..s],l)];
-//		print"TESSSSST",phivalues;
-		Append(~ModExponents,Ceiling(Maximum([0] cat phivalues))+1);
-		end for;
-		tmpl:=[];
-			
-	end if;
-	Append(~ModExpList,ModExponents);
-	ModExponents:=[];
-end for;
-LengthModExp:=[#j:j in ModExpList];
-factorModList,EndExpos,exportexpos:=Subsec(ModExpList,p,modalphas);//Subsec(ProdList(&cat ModExpList,p),LengthModExp,modalphas);
-//print"TESSSSST2",ModExpList;
-//print"Input ComputMultis:",FacIndex,Facprecision;
-kx<x>:=PolynomialRing(Integers());
-Multis:=[[kx!1]:i in [1..s]];
-MultiIndex:=[[]:i in [1..s]];
-
-for i in [1..s] do
-
-	SFLList:=[-1:i in [1..s]];
-	for j in [1..s] do
-	
-		if i in FacIndex[j] then
-			SFLList[j]:=Facprecision[j,Position(FacIndex[j],i)];
-		
-		end if;
-	
-	end for;
-	SortSFLList:=Sort(SFLList);
-	Bijec:=Sort(SFLList,SortSFLList);
-	tmp:=0;
-//		print"\n whatz",SFLList,SortSFLList,Bijec;
-
-
-		Maxi:=Maximum(SortSFLList);
-		if Maxi gt tmp then //kann man statt tmp auch v_p(Phi_P) nehmen, wird aber eh in SFL gecheckt
-			
-		//	beta:=1;//3/4;//9/16;//5/8;
-			Slope:=Maxi-F`PrimeIdeals[p,i]`Type[#F`PrimeIdeals[p,i]`Type]`V;
-			SFL(~F`PrimeIdeals[p,i]`Type,Ceiling(Slope));
-            last_lvl := F`PrimeIdeals[p,i]`Type[#F`PrimeIdeals[p,i]`Type];
-            h := last_lvl`h - last_lvl`cuttingslope;
-            lasth := Ceiling(Slope) - last_lvl`cuttingslope;
-            path:=PathOfPrecisions(lasth,h);
-            if #path gt 0 then
-                F`SFLCount +:= (#path - 1);
-            end if;
-	
-
-			tmp:=Maxi; //hier genauso: \\kann man statt tmp auch v_p(Phi_P) nehmen, wird aber eh in SFL gecheckt
-		end if;
-	for j in [1..#SortSFLList] do	
-		if SortSFLList[j] ge 0 then
-			Append(~Multis[Bijec[j]],F`PrimeIdeals[p,i]`Type[#F`PrimeIdeals[p,i]`Type]`Phi);
-			Append(~MultiIndex[Bijec[j]],i);	
-		end if;
-	
-	end for;
-end for;
-//pPowers:=ProdList(ModExponents,p);
-//print"Multis",Multis,factorModList;
-//PutInZ([&*i:i in Multis]);PutInZ([ModProd(Multis[i],p^ModExponents[i]):i in [1..s]]);
-//return [&*i:i in Multis],MultiIndex;
-z_kappa:=[];
-for ll in [1..#Multis] do
-	if #Multis[ll] eq 1 and Multis[ll,1] eq 1 then
-		Append(~z_kappa,Multis[ll,1]);
-	else		
-	Append(~z_kappa,(&*[Multis[ll,mm] mod factorModList[ll,mm-1]:mm in [2..#Multis[ll]]]) mod EndExpos[ll] );//mod EndExpos[mm] 
-	end if;
-end for;
-return z_kappa,MultiIndex,exportexpos;
-end intrinsic;
-
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-intrinsic ProdList(Expos::SeqEnum,p::RngIntElt)->SeqEnum
-{Produces [p^[Expos[i]]:i in [1..#Expos]] in a intelligent way}
-
-Sort(~Expos,~permutation);
-Factors:=[];
-prod:=1; j:=0;
-for i in [1..#Expos] do
-	exp:=Expos[i]-j;
-	j:=Expos[i];
-	prod:=prod*p^exp;
-	Append(~Factors,prod);
-
-end for;
-
-return [Factors[j]:j in Eltseq(permutation^-1)];
-
-end intrinsic;
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-
-
-intrinsic Eval(F::FldNum,z::RngUPolElt)->FldFunElt
-{Evaluates Polynomial in F.1}
-
-L:=Eltseq(z);
-if #L gt Degree(F) then
-	print"Error in Eval";
-	return z;
-end if;
-
-return F!(L cat [0:i in [1..Degree(F)-#L]]);
-end intrinsic;
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-intrinsic Subsec(List::SeqEnum,p::RngIntElt,ExtraList::SeqEnum)->SeqEnum
-{Splits Liste into sublists of length Lenght[i]}
-//=Subsec(ModExpList,p,LengthModExp,modalphas)
-
-
-Liste:=&cat List;
-Liste2:=&cat ExtraList;
-Length:=[#i:i in List];
-factorList:=ProdList(Liste cat Liste2,p);
-exportList:=[factorList[jj]:jj in [#Liste+1..#Liste+#Liste2]];
-Liste:=[factorList[jj]:jj in [1..#Liste]];
-//print"listen",exportList,Liste2;
-
-
-useherelist:=[];
-for l in [1..#ExtraList] do
-	Append(~useherelist,exportList[Position(Liste2,Maximum(ExtraList[l]))]);
-end for;
-
-
-if not #Liste eq &+Length  then print"Liste und Length nicht kompatible"; return 0; end if;
-	Out:=[];
-	LL:=[];j:=1;
-	for i in [1..#Liste] do
-	
-		Append(~LL,Liste[i]);
-		if i eq &+[Length[ll]:ll in [1..j]] then
-		
-			Append(~Out,LL);
-			LL:=[];
-			j:=j+1;
-		end if;
-		
-	end for;
-	
-
-return Out,useherelist,exportList;
-
-end intrinsic;
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-intrinsic PhiValuation(F::FldNum,p::RngIntElt,IndexPhi:: SeqEnum, IndexPrime::RngIntElt)->RngIntElt
-{Computes the valuation of Phi at Prime}
-
-P:=IndexPhi[1];
-i:=IndexPhi[2];
-if i eq 0 then 	
-	if Degree(F`PrimeIdeals[p,IndexPrime]`Type[1]`Phi) gt 1 then
-		return 0;		
-	else
-		if F`PrimeIdeals[p,IndexPrime]`Type[1]`Phi eq Parent(F`PrimeIdeals[p,IndexPrime]`Type[1]`Phi).1 then
-			return $$(F,p,[P,1],IndexPrime);			
-		else	
-			tmp:=Minimum([Valuation(Eltseq(F`PrimeIdeals[p,IndexPrime]`Type[1]`Phi)[1],p),F`PrimeIdeals[p,IndexPrime]`Type[1]`slope]);
-		//	print"sadasd",tmp,PValuation(F.1,F`PrimeIdeals[p,IndexPrime])/F`PrimeIdeals[p,IndexPrime]`e;
-			//Dass kann man auch mit: phi_1=x+a, dann v(theta)=Min(v(a),lambda_1)";	
-			return tmp;//PValuation(F.1,F`PrimeIdeals[p,IndexPrime])/F`PrimeIdeals[p,IndexPrime]`e; 
-		end if;		
-	end if;	
-
-end if;
-Q:=IndexPrime;
-t1:=F`PrimeIdeals[p,P]`Type;
-if P eq Q then
-	return (t1[i]`V+Abs(t1[i]`slope))/t1[i]`prode;
-end if;
-t2:=F`PrimeIdeals[p,Q]`Type;
-IndexOfCoincidence2(~t1,~t2,~ioc);
-
-if ioc eq 0 then 
-	return 0;
-else
-	Ref1:=Append(t1[ioc]`Refinements,[* t1[ioc]`Phi,t1[ioc]`slope *]);
-	Ref2:=Append(t2[ioc]`Refinements,[* t2[ioc]`Phi,t2[ioc]`slope *]);
-	minlength:=Min(#Ref1,#Ref2);
-	ii:=2;
-	while ii le minlength and Ref1[ii,1] eq Ref2[ii,1] do 
-	    ii+:=1;    
-	end while;
-	hiddenslope1:=Ref1[ii-1,2];
-	hiddenslope2:=Ref2[ii-1,2];
-	minslope:=Min([hiddenslope1,hiddenslope2]);
-	entry:=(t1[ioc]`V+minslope)/t1[ioc]`prode;
-
-	if i lt ioc then 
-		return (t1[i]`V+Abs(t1[i]`slope))/t1[i]`prode;	
-	end if;
-	
-	if i eq ioc then 	
-		if Ref1[ii-1,1] eq t1[ioc]`Phi then 
-			return (t1[ioc]`V+hiddenslope2)/t1[ioc]`prode;		
-		else
-			return entry;	
-	
-		end if;
-	else 
-		return entry*Degree(t1[i]`Phi)/Degree(t1[ioc]`Phi);
-	end if;	
-end if;	
-
-
-end intrinsic;
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-intrinsic Deg(z::FldNumElt)->RngIntElt
-{}
-if z eq 0 then return -Infinity();end if;
-
-L:=Eltseq(z);
-tmp:=exists(t){y:y in [Degree(Parent(z))..1 by -1]|not L[y] eq 0 };
-
-return t-1;
-
-end intrinsic;
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-intrinsic PhiExpo(m::RngIntElt,DegList::SeqEnum)->SeqEnum
-{Compute mi/m_i-1 representation of an integer m}
-L:=[];
-DegList:=[1] cat DegList;
-BoundList:=[Integers()!(DegList[i]/DegList[i-1]):i in [2..#DegList]];
-for i in [1..#BoundList] do
-
-	Append(~L,Integers()!(m mod BoundList[i]));
-	m:=m div BoundList[i];
-
-end for;
-
-
-return L;
-
-end intrinsic;
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-intrinsic Sort(L::SeqEnum,SortL::SeqEnum)->SeqEnum
-{Gives Bijection between L and SortL}
-
-Per:=[];
-for i in [1..#L] do
-
-	j:=Position(L,SortL[i]);
-	Append(~Per,j);
-	L[j]:=-2;
-
-end for;
-
-return Per;
-
-end intrinsic;
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
