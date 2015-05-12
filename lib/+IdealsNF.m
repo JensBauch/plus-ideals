@@ -1328,16 +1328,6 @@ end intrinsic;
 /////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////
 
-intrinsic pIntegralBasis(K::FldNum,p::RngIntElt)->SeqEnum
-{Compute a  p-integral basis of ZK}
-
-Montes(K,p: Basis:=true);
-return K`pBasis[p];
-end intrinsic;   
-
-/////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////
-
 intrinsic PrescribedValue(~type,value,~Phi,~logphi)
 {Compute a polynomial Phi=phi_1^a_1...phi_r^a_r such that v_P(p^a_0Psi(theta))=value, 
 where P is the prime determined by the given type with Okutsu depth r. 
@@ -1839,40 +1829,6 @@ if precision gt 0 then
 //    beta:=Evaluate(num,P`Parent.1)*p^exp;  
     beta:=P`Parent!Eltseq(num)*p^exp;  
 end if;
-end intrinsic;
-
-/////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////
-
-intrinsic SIntegralBasis(K::FldNum,primelist::SeqEnum)->SeqEnum
-{Compute a local integral basis for the given set of primes.}
-
-Numlist:=[];
-Denlist:=[];
-for p in primelist do
-    pHBasis:=pHermiteBasis(K,p);    
-    if K`LocalIndex[p] gt 0 then
-	Append(~Numlist,[Eltseq(Numerator(x),Integers()): x in pHBasis]);
-	Append(~Denlist,[Denominator(x): x in pHBasis]);
-    end if;
-end for;
-n:=Degree(K);
-nprimes:=#Denlist;
-if nprimes eq 0 then
-    return [K.1^k: k in [0..n-1]];   
-end if;
-SBasis:=[K!1];
-for i:=2 to n do
-    Dens:=[Denlist[k,i] : k in [1..nprimes]];
-    coeffs:=[];
-    for j:=1 to i-1 do 
-	Nums:=[Numlist[k,i,j] : k in [1..nprimes]]; 
-	Append(~coeffs,CRT(Nums,Dens));
-    end for;
-    coeffs cat:=[0: j in [1..n-#coeffs]];
-    Append(~SBasis,(K.1^(i-1)+K!coeffs)/&*Dens);
-end for;    
-return SBasis;
 end intrinsic;
 
 /////////////////////////////////////////////////////////////////////////////////////
@@ -3499,12 +3455,29 @@ intrinsic calculateOkutsuFramesValues(types)-> List
     // x required to make okutsu basis elements of degree not congruent with 0
     // mod deg(phi_1).
     x := Parent(types[1]`Type[1]`Phi).1;
+    theta_values := [* *];
     for i in [1..#types] do
         if ok_frames[i,1]`degree gt 1 then
+            if #theta_values eq 0 then
+                for j in [1..#types] do
+                    phiPj := types[j]`Type[1]`Phi;
+                    if Degree(phiPj) eq 1 then
+                        a := Coefficient(phiPj, 0);
+                        if a eq 0 then
+                            nu := types[j]`Type[1]`slope;
+                        else
+                            nu := Valuation(a, types[j]`IntegerGenerator);
+                        end if;
+                    else
+                        nu := Rationals()!0;
+                    end if;
+                    Append(~theta_values, nu);
+                end for;
+            end if;
             Insert(~ok_frames[i], 1, rec<OkutsuFrameLevel|
                                             degree:=1,
                                             index:=0,
-                                            values:=[* 0 : type in types *],
+                                            values:=theta_values,
                                             polynomial:=x>);
         end if;
     end for;
