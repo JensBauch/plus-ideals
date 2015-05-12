@@ -3131,6 +3131,26 @@ intrinsic reduceIdeal(I::Rec, p::RngIntElt : exponents:=false)-> Rec, RngIntElt
     end if;
 end intrinsic; // reduceIdeal
 
+intrinsic HermiteFormBasis(K::FldNum, p::RngIntElt, nums::SeqEnum, dexp::SeqEnum)-> SeqEnum
+    { }
+
+    n := Degree(K);
+    maxexp := dexp[n];
+    p_max := p^maxexp;
+    Nums := [ [ Coefficient(nums[i], j) * p^(maxexp-dexp[i])
+                :  j in [n-1..0 by -1] ]
+                    : i in [n..1 by -1] ];
+
+    Zp := pAdicRing(p, maxexp+1);
+    pi := UniformizingElement(Zp);
+    matrix_red := Matrix(Zp, Nums);
+    hnf_matrix := HermiteForm(matrix_red);
+
+    hnf_basis := Reverse([ K!Reverse(Eltseq(hnf_matrix[i]))/p_max :
+                                i in [1..n] ]);
+
+    return hnf_basis; 
+end intrinsic; // HermiteFormBasis
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
@@ -3196,6 +3216,11 @@ intrinsic SIdealBasis(I::Rec, primelist::SeqEnum)-> SeqEnum
     DenCRTlist := [];
     factor := 1;
 
+
+    if #primelist eq 0 then
+        return [K.1^k: k in [0..n-1]];
+    end if;
+
     for p in primelist do
 
         Montes(K, p);
@@ -3218,20 +3243,14 @@ intrinsic SIdealBasis(I::Rec, primelist::SeqEnum)-> SeqEnum
         Append(~DenCRTlist, dens_crt);
     end for;
 
-    nprimes := #Denlist;
-
-    if nprimes eq 0 then
-        return [K.1^k: k in [0..n-1]];
-    end if;
-
     SBasis := [ K | ];
 
     for i := 1 to n do
-        Dens := [ Denlist[k, i] : k in [1..nprimes] ];
-        DensCRT := [ DenCRTlist[k,i] : k in [1..nprimes] ];
+        Dens := [ Denlist[k, i] : k in [1..#primelist] ];
+        DensCRT := [ DenCRTlist[k,i] : k in [1..#primelist] ];
         coeffs := [];
         for j := 1 to i-1 do
-            Nums := [Numlist[k, i, j] : k in [1..nprimes]];
+            Nums := [Numlist[k, i, j] : k in [1..#primelist]];
             Append(~coeffs, CRT(Nums, DensCRT));
         end for;
         coeffs cat:= [0: j in [1..n-#coeffs]];
@@ -3242,39 +3261,15 @@ intrinsic SIdealBasis(I::Rec, primelist::SeqEnum)-> SeqEnum
 end intrinsic; // SIdealBasis
 
 
-intrinsic HermiteFormBasis(K::FldNum, p::RngIntElt, nums::SeqEnum, dexp::SeqEnum)-> SeqEnum
-    { }
-
-    n := Degree(K);
-    maxexp := dexp[n];
-    p_max := p^maxexp;
-    Nums := [ [ Coefficient(nums[i], j) * p^(maxexp-dexp[i])
-                :  j in [n-1..0 by -1] ]
-                    : i in [n..1 by -1] ];
-
-    Zp := pAdicRing(p, maxexp+1);
-    pi := UniformizingElement(Zp);
-    matrix_red := Matrix(Zp, Nums);
-    hnf_matrix := HermiteForm(matrix_red);
-
-    hnf_basis := Reverse([ K!Reverse(Eltseq(hnf_matrix[i]))/p_max :
-                                i in [1..n] ]);
-
-    return hnf_basis; 
-end intrinsic; // HermiteFormBasis
-
 intrinsic HermiteFormBasis(K::FldNum, basis::SeqEnum)-> SeqEnum
     { We assume that the (global) basis is triangular. }
 
     n := #basis;
-    kt := PolynomialRing(ConstantField(K));
     dens := [ Denominator(g) : g in Reverse(basis) ];
     maxden := dens[1];
 
-    int_basis := [ g*maxden : g in Reverse(basis) ];
-    A := Matrix(kt, [ Reverse(Eltseq(g*maxden, BaseField(K)))
+    A := Matrix(Integers(), [ Reverse(Eltseq(g*maxden, Rationals()))
                         : g in Reverse(basis) ]);
-
     H := HermiteForm(A);
 
     hnf_basis := [ K!Reverse(Eltseq(H[i]))/maxden : i in [n..1 by -1] ];
@@ -3348,7 +3343,6 @@ end intrinsic; // MaxMinCore
 intrinsic MaxMin(K::FldNum, p::RngIntElt, exponents)-> SeqEnum, SeqEnum, SeqEnum
     { }
 
-    maxmin_time := Cputime();
     s := #K`PrimeIdeals[p];
     ok_frames := calculateOkutsuFramesValues(K`PrimeIdeals[p]);
     bases_indices := [* *];
@@ -3359,7 +3353,6 @@ intrinsic MaxMin(K::FldNum, p::RngIntElt, exponents)-> SeqEnum, SeqEnum, SeqEnum
     for i := 1 to s do
         Append(~bases_indices, calculateBasisIndices(K`PrimeIdeals[p,i]));
     end for;
-
     bases_values := computeBasesValues(bases_indices, ok_frames);
     modifiers := [ exponents[i]/K`PrimeIdeals[p,i]`e : i in [1..s] ];
 
@@ -3367,12 +3360,8 @@ intrinsic MaxMin(K::FldNum, p::RngIntElt, exponents)-> SeqEnum, SeqEnum, SeqEnum
     indices, den_exp, values, req_approx_values := MaxMinCore(bases_values,
                                                               modifiers);
 
-    sfl_time := Cputime();
-
     liftMontesApproximations(~K`PrimeIdeals[p], req_approx_values);
     updateOkutsuFrames(~ok_frames, K`PrimeIdeals[p]);
-
-    polmul_time := Cputime();
 
     if #ok_frames eq 1 then
         basis := computeOkutsuBasis(ok_frames[1]);
@@ -3386,7 +3375,6 @@ intrinsic MaxMin(K::FldNum, p::RngIntElt, exponents)-> SeqEnum, SeqEnum, SeqEnum
     basis := basis[1..#basis-1];
     den_exp := den_exp[1..#den_exp-1];
 
-    reduce_time := Cputime();
     reducepBasis(~basis, den_exp, modifiers, p);
 
     den_exp := [ Floor(v) : v in den_exp ];
@@ -3404,27 +3392,15 @@ end intrinsic; // MaxMin
 ////////////////////////////////////////////////////////////////////////////////
 
 
-intrinsic liftMontesApproximations(~types::SeqEnum[Rec], req_phip_vals::List : range:=false)
+intrinsic liftMontesApproximations(~types::SeqEnum[Rec], req_phip_vals::List)
     { Increase each $\phi_\P$ so that it's $\P$-value is at least that of
       the corresponding entry in `req_phip_vals`. }
 
-    if Type(range) eq BoolElt and range eq false then
-        range := [1 ..#types];
-    end if;
-
     for i in [1..#req_phip_vals] do
-        ri := range[i];
-        V := types[ri]`Type[#types[range[i]]`Type]`V;
-        required_slope := (req_phip_vals[i] * types[ri]`e) - V;
-        if required_slope ge types[ri]`Type[#types[ri]`Type]`slope then
-            last_lvl := types[ri]`Type[#types[ri]`Type];
-            h := last_lvl`h - last_lvl`cuttingslope;
-            lasth := Ceiling(required_slope) - last_lvl`cuttingslope;
-            path := PathOfPrecisions(lasth,h);
+        V := types[i]`Type[#types[i]`Type]`V;
+        required_slope := (req_phip_vals[i] * types[i]`e) - V;
 
-            SFL(~types[ri], Ceiling(required_slope));
-            
-        end if;
+        SFL(~types[i], Ceiling(required_slope));
     end for;
 
 end intrinsic; // liftMontesApproximations
@@ -3537,20 +3513,13 @@ intrinsic calculateOkutsuFramesValues(types)-> List
 end intrinsic; // calculateOkutsuFramesValues
 
 
-intrinsic updateOkutsuFrame(~frame::SeqEnum, type::Rec, i::RngIntElt)
-    { Update an Okutsu frame after a type has been (single factor) lifted. }
-
-    lvlr := type`Type[#type`Type];
-    frame[#frame]`polynomial := lvlr`Phi;
-    frame[#frame]`values[i] := (lvlr`V + lvlr`slope)/lvlr`prode;
-
-end intrinsic; // updateOkutsuFrame
-
 intrinsic updateOkutsuFrames(~ok_frames::SeqEnum, types::SeqEnum)
     { }
 
     for i in [1..#ok_frames] do
-        updateOkutsuFrame(~ok_frames[i], types[i], i);
+        lvlr := types[i]`Type[#types[i]`Type];
+        ok_frames[i,#ok_frames[i]]`polynomial := lvlr`Phi;
+        ok_frames[i,#ok_frames[i]]`values[i] := (lvlr`V + lvlr`slope)/lvlr`prode;
     end for;
 
 end intrinsic; // updateOkutsuFrames
@@ -3583,30 +3552,14 @@ intrinsic computeBasisValues(t_ind, t_frame)-> SeqEnum
         t_frame[k]`degree := Integers()!(t_frame[k]`degree/t_frame[1]`degree);
     end for;
 
-    if Type(t_frame[1]`values[1]) eq List then
-        // This okutsu frame is a composite "terminal" frame.
-        values := [ [ [ExtendedReals()| 0 : v in val_group]
-                        : val_group in t_frame[1]`values ] ];
-        for m := 2 to #t_ind do
-            v, u := Max([t_ind[m,i]-t_ind[m-1,i] : i in [1..#t_ind[m]]]);
-            prev_vals := [ values[m-t_frame[u]`degree,j]
-                                : j in [1..#t_frame[1]`values] ];
-            e_vals := [ [ExtendedReals()| prev_vals[j,k]+t_frame[u]`values[j,k]
-                            : k in [1..#prev_vals[j]] ]
-                                : j in [1..#prev_vals] ];
-            Append(~values, e_vals);
-        end for;
-    else
-        // This is a normal Okutsu frame.
-        values := [ [ ExtendedReals()| 0 : j in [1..#t_frame[1]`values] ] ];
-        for m := 2 to #t_ind do
-            v, u := Max([t_ind[m,i]-t_ind[m-1,i] : i in [1..#t_ind[m]]]);
-            e_vals := [ExtendedReals()|
-                          values[m-t_frame[u]`degree,j] + t_frame[u]`values[j]
-                              : j in [1..#t_frame[1]`values] ];
-            Append(~values, e_vals);
-        end for;
-    end if;
+    values := [ [ ExtendedReals()| 0 : j in [1..#t_frame[1]`values] ] ];
+    for m := 2 to #t_ind do
+        v, u := Max([t_ind[m,i]-t_ind[m-1,i] : i in [1..#t_ind[m]]]);
+        e_vals := [ExtendedReals()|
+                      values[m-t_frame[u]`degree,j] + t_frame[u]`values[j]
+                          : j in [1..#t_frame[1]`values] ];
+        Append(~values, e_vals);
+    end for;
 
     return values;
 end intrinsic; // computeBasisValues
@@ -3624,7 +3577,7 @@ intrinsic computeBasesValues(indices, okutsu_frames)-> List
     return bases_values;
 end intrinsic; // computeBasesValues
 
-intrinsic calculateBasisIndices(type::Rec: mod_lvl:=0)-> List
+intrinsic calculateBasisIndices(type::Rec)-> List
     { Calculate the indices that represent basis elements. The 0th indiex is
       the exponent of x (only used if f_0 > 1) then the i-th index is the
       exponent of phi_i,P for the P associated with this type. }
@@ -3633,13 +3586,11 @@ intrinsic calculateBasisIndices(type::Rec: mod_lvl:=0)-> List
     m1 := Degree(type`Type[1]`Phi mod type`IntegerGenerator);
     pools := [ ];
 
-    if mod_lvl eq 0 then
-        if m1 gt 1 then
-            pools cat:= [ [0..m1-1] ];
-        end if;
-        mod_lvl := 1;
+    if m1 gt 1 then
+        pools := [ [0..m1-1] ];
     end if;
-    pools cat:= [ [0..lvls[r]`e * lvls[r]`f - 1] : r in [mod_lvl..#lvls-1] ];
+
+    pools cat:= [ [0..lvls[r]`e * lvls[r]`f - 1] : r in [1..#lvls-1] ];
     pools cat:= [ [0] ];
 
     indices := itertoolsProduct(pools);
@@ -3660,13 +3611,12 @@ intrinsic computeLocalBasis(lb_indices, bases_indices, frames, pprec)-> List
             just the Okutsu frame. }
 
     s := #frames;
-    local_basis := [* Parent(frames[1,1]`polynomial)!1 *];
+    local_basis := [* PolynomialRing(Integers())!1 *];
     f_bases := [ AssociativeArray() : i in [1..s] ];
 
     for m := 2 to #lb_indices do
         _, i := Max([lb_indices[m,j]-lb_indices[m-1,j] : j in [1..s]]);
         
-//        printf "%3o: %o %o\n", m, lb_indices[m], bases_indices[i,lb_indices[m,i]];
         u_ind := lb_indices[m,i];
         _, u := Max([bases_indices[i,u_ind,j] - bases_indices[i,u_ind-1,j]
                             : j in [1..#bases_indices[i,u_ind]]]);
@@ -3679,7 +3629,8 @@ intrinsic computeLocalBasis(lb_indices, bases_indices, frames, pprec)-> List
             basis_el := local_basis[m-ch_deg] * frames[i,u]`polynomial;
         else
             not_i := [1..i-1] cat [i+1..s];
-            if &+[ lb_indices[m,j]-lb_indices[m-ch_deg,j] : j in not_i ] eq 0 then
+//            if &+[ lb_indices[m,j]-lb_indices[m-ch_deg,j] : j in not_i ] eq 0 then
+            if lb_indices[m,i] - lb_indices[m-ch_deg,i] eq ch_deg then
                 basis_el := local_basis[m-ch_deg] * frames[i,u]`polynomial;
             else
                 basis_el := 1;
@@ -3714,7 +3665,7 @@ intrinsic computeOkutsuBasisElement(~basis, frame, indices, m)
 
     if m eq 1 then
         // Cheating a bit, but this *must* be true.
-        basis[m] := Parent(frame[1]`polynomial)!1;
+        basis[m] := PolynomialRing(Integers())!1;
     else
         _, u := Max([ indices[m,j]-indices[m-1,j] : j in [1..#indices[m]] ]);
         computeOkutsuBasisElement(~basis, frame, indices,
