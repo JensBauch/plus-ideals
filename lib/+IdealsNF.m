@@ -1030,7 +1030,10 @@ else
     end for;
     universe:=&*Compensations;
 //    Betas:=[Evaluate(universe div x,K.1): x in Compensations];
-    Betas:=[K!Eltseq(universe div x): x in Compensations];
+    Betas := [ PolToFieldElt(K, universe div x) : x in Compensations ];
+    //Betas := [ K![ Coefficient(u_div_x, j) : j in [0..Degree(K)-1] ]
+    //                : u_div_x in [ universe div x : x in Compensations ] ];
+    //Betas:=[K!Eltseq(universe div x): x in Compensations];
 end if;
 Multipliers:=[K!0: i in [1..nprimes]];
 for i:=1 to ntrees do
@@ -1041,11 +1044,20 @@ for i:=1 to ntrees do
 	den:=Denominator(mult);
 	module:=den*p^(extraden+Ceiling(mx));
 	num:=PolynomialRing(Integers())!Eltseq(Numerator(mult),Integers());
-//	mult:=Evaluate(num mod module,K.1)/den;    
-	mult:=K!Eltseq(num mod module)/den;    
+    mult := PolToFieldElt(K, num mod module)/den;
 	Multipliers[t]:=mult;
     end for;
 end for;
+end intrinsic;
+
+///////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////
+
+intrinsic PolToFieldElt(K::FldNum, g::RngUPolElt)-> FldNumElt
+    { Convert a polynomial to a number field element. This is equivalent
+      to g(K.1), but more efficient. }
+
+    return K![ Coefficient(g, j) : j in [0..Degree(K)-1] ];
 end intrinsic;
 
 ///////////////////////////////////////////////////////////////////////////////////
@@ -2947,14 +2959,18 @@ end intrinsic;
 intrinsic pBasis(I::Rec, p::RngIntElt : HNF:=false, Separated:=false) -> SeqEnum
     { Computes a p-integral basis of the fractional ideal }
       
+    K := I`Parent;
     nums, dexp, a := pBasisTriangular(I, p);
 
     if HNF eq true then
-        basis := HermiteFormBasis(I`Parent, p, nums, dexp);
+        alpha := Maximum([ (f[3] / K`PrimeIdeals[f[1],f[2]]`e) - a
+                                                    : f in I`Factorization ]);
+        pprec := Maximum(Floor(dexp[#dexp] + alpha), 0) + 1;
+
+        basis := HermiteFormBasis(I, p, nums, dexp, pprec);
 
         nums := [ PolynomialRing(Integers())!Eltseq(Numerator(b)) : b in basis ];
     else
-        K := I`Parent;
         basis := Reverse([ (K![ Coefficient(nums[i], j)
                             : j in [0..#nums-1] ])/K!p^dexp[i]
                                 : i in [#nums..1 by -1] ]);
@@ -3021,6 +3037,8 @@ intrinsic reduceIdeal(I::Rec, p::RngIntElt : exponents:=false)-> Rec, RngIntElt
     end if;
 
     J := &*[ I`Parent`PrimeIdeals[p,i]^Expos[i] : i in [1..s] ];
+    print I;
+    print J;
 
     if exponents eq true then
         return Expos, a;
@@ -3029,9 +3047,10 @@ intrinsic reduceIdeal(I::Rec, p::RngIntElt : exponents:=false)-> Rec, RngIntElt
     end if;
 end intrinsic; // reduceIdeal
 
-intrinsic HermiteFormBasis(K::FldNum, p::RngIntElt, nums::SeqEnum, dexp::SeqEnum)-> SeqEnum
+intrinsic HermiteFormBasis(I::Rec, p::RngIntElt, nums::SeqEnum, dexp::SeqEnum, pprec::RngIntElt)-> SeqEnum
     { }
 
+    K := I`Parent;
     n := Degree(K);
     maxexp := dexp[n];
     p_max := p^maxexp;
@@ -3039,7 +3058,7 @@ intrinsic HermiteFormBasis(K::FldNum, p::RngIntElt, nums::SeqEnum, dexp::SeqEnum
                 :  j in [n-1..0 by -1] ]
                     : i in [n..1 by -1] ];
 
-    Zp := pAdicRing(p, maxexp+1);
+    Zp := pAdicRing(p, pprec);
     pi := UniformizingElement(Zp);
     matrix_red := Matrix(Zp, Nums);
     hnf_matrix := HermiteForm(matrix_red);
@@ -3273,7 +3292,7 @@ intrinsic MaxMin(K::FldNum, p::RngIntElt, exponents)-> SeqEnum, SeqEnum, SeqEnum
     basis := basis[1..#basis-1];
     den_exp := den_exp[1..#den_exp-1];
 
-    reducepBasis(~basis, den_exp, modifiers, p);
+    //reducepBasis(~basis, den_exp, modifiers, p);
 
     den_exp := [ Floor(v) : v in den_exp ];
 
