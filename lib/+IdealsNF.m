@@ -3615,26 +3615,14 @@ end intrinsic; // reductionExponents
 intrinsic reducepBasis(~nums::SeqEnum, dexp::SeqEnum, modifiers::SeqEnum, p::RngIntElt)
     { Reduce all basis numerators mod their valuation. }
 
-    // We can reduce each basis element g modulo p^(w_I(g + max))
+    // We can reduce each basis element g modulo p^(w_I(g) + max)
     max_modifier := Maximum(modifiers);
-    mod_exponents := [ Maximum(Ceiling(v + max_modifier), 0)+1 : v in dexp ];
-//    printf "\n(reducepBasis) mod_exponents: %o\n", mod_exponents;
+    mod_exponents := [ Maximum(Floor(v + max_modifier), 0)+1 : v in dexp ];
     mods := [ p^mod_exponents[1] ];
-    prime_cache := AssociativeArray();
     for i in [2..#mod_exponents] do
-        delta := mod_exponents[i] - mod_exponents[i-1];
-        j := Index(mod_exponents, delta);
-        if j gt 0 then
-            delta_power := mods[j];
-        elif IsDefined(prime_cache, j) then
-            delta_power := prime_cache[j];
-        else
-            delta_power := p^j;
-            prime_cache[j] := delta_power;
-        end if;
-        
-        Append(~mods, mods[i-1] * delta_power);
+        Append(~mods, mods[i-1] * p^(mod_exponents[i] - mod_exponents[i-1]));
     end for;
+    //mods := [ p^nu : nu in mod_exponents ];
 
     tmps := Cputime();
     n := #nums;
