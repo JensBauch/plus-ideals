@@ -472,79 +472,23 @@ intrinsic IndexOfCoincidence(~t1,~t2,~i,p)
 (t1[i]`Phi,t1[i]`slope,t1[i]`psi) and (t2[i]`Phi,t2[i]`slope,t2[i]`psi) are different.
 The types must correspond to different prime ideals.}
 
-if t1[1]`Phi mod p ne t2[1]`Phi mod p then 
-    i:=0;
-end if;
-i:=1;
-while t1[i]`Phi eq t2[i]`Phi and t1[i]`slope eq t2[i]`slope and t1[i]`psi eq t2[i]`psi do
-    i+:=1;
-end while;	
-end intrinsic;
-
-intrinsic IndexOfCoincidence(t1::Rec, t2::Rec)-> RngIntElt
-    { The index of coincidence of types t1 and t2. }
-
-    require t1`IntegerGenerator eq t2`IntegerGenerator:
-        "Types attached to difference prime numbers.";
-
-    if t1`Type[1]`Phi mod t1`IntegerGenerator ne t2`Type[1]`Phi mod t1`IntegerGenerator then
-        // These types don't have a common psi_0.
-        index := 0;
-    else
-        index := 1;
-        while t1`Type[index]`Phi eq t2`Type[index]`Phi and
-                t1`Type[index]`slope eq t2`Type[index]`slope and
-                t1`Type[index]`psi eq t2`Type[index]`psi do
-            index +:= 1;
-        end while;
-    end if;
-
-    return index;
-end intrinsic;
-
-intrinsic IndexOfCoincidence(t1::SeqEnum, t2::SeqEnum)-> RngIntElt
-    { The index of coincidence of types t1 and t2. }
-
-    i := 0;
-
-    IndexOfCoincidence(~t1, ~t2, ~i);
-
-    return i;
-end intrinsic; // IndexOfCoincidence
-
-
-
-intrinsic IndexOfCoincidence2(~t1,~t2,~i,p)
-{the types must correspond to different prime ideals}
-
-if t1[1]`Phi mod p ne t2[1]`Phi mod p then 
-    i:=0;
-else
-
+i:=0;
+if t1[1]`Phi mod p eq t2[1]`Phi mod p then 
 i:=1;
 while t1[i]`Phi eq t2[i]`Phi and t1[i]`slope eq t2[i]`slope and t1[i]`psi eq t2[i]`psi do
     i+:=1;
 end while;	
 end if;
-
 end intrinsic;
 
 intrinsic IndexOfCoincidence(t1::Rec, t2::Rec)-> RngIntElt
     { The index of coincidence of types t1 and t2. }
 
-    i := 0;
-    IndexOfCoincidence(~t1`Type, ~t2`Type, ~i, t1`IntegerGenerator);
-
-    return i;
-end intrinsic;
-
-intrinsic IndexOfCoincidence(t1::SeqEnum, t2::SeqEnum)-> RngIntElt
-    { }
-
-    i := 0;
-    IndexOfCoincidence(~t1, ~t2, ~i);
-
-    return i;
+require t1`IntegerGenerator eq t2`IntegerGenerator:
+        "Types attached to different prime numbers.";
+i := 0;
+IndexOfCoincidence(~t1`Type, ~t2`Type, ~i, t1`IntegerGenerator);
+return i;
 end intrinsic;
 
 /////////////////////////////////////////////////////////////////////////////////////
@@ -581,15 +525,13 @@ end intrinsic;
 /////////////////////////////////////////////////////////////////////////////////////
 
 intrinsic IntegralBasis(K::FldNum)->SeqEnum
-{Compute a basis  of the maximal order ZK of K and the discriminant of K.}
+    {Compute a basis  of the maximal order ZK of K and the discriminant of K.}
 
-if not assigned K`IntegralBasis then 
-    if not assigned K`FactorizedDiscriminant then
-	K`FactorizedDiscriminant:=Factorization(Discriminant(DefiningPolynomial(K)));
+    if not assigned K`IntegralBasis then 
+        K`IntegralBasis := IdealBasis(ideal(K, K!1));
     end if;
-    K`IntegralBasis:=SIntegralBasis(K,[x[1]: x in K`FactorizedDiscriminant]);
-end if;
-return K`IntegralBasis;
+
+    return K`IntegralBasis;
 end intrinsic;
 
 /////////////////////////////////////////////////////////////////////////////////////
