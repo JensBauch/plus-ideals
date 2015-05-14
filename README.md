@@ -23,3 +23,13 @@ magma examples/example-ff.m
 for the function field example.
 
 
+Testing
+-------
+
+There are tests that can be run in the `tests` directory.
+
+
+Important
+---------
+
+The `develop` branch should not be used. It may not be mathematically correct.
