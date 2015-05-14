@@ -26,16 +26,17 @@ FactorizationString:  MonStgElt,
 Generators: SeqEnum , 
 IntegerGenerator: Integers(),
 Generator: FldNumElt,
-Position: Integers(),        /* only for prime ideals */  
-Type: SeqEnum,              /* only for prime ideals */
-e: Integers(),              /* only for prime ideals */
-f: Integers(),              /* only for prime ideals */
-exponent: RngIntElt,        /* only for prime ideals */
-LocalGenerator: FldNumElt,  /* only for prime ideals */
-LogLG: ModTupRngElt,        /* only for prime ideals */
-CrossValues: SeqEnum,      /* only for prime ideals */
-Phiadic: List,       /* only for prime ideals */
-sfl: SeqEnum            /* only for prime ideals */
+Position: Integers(),          /* only for prime ideals */  
+Type: SeqEnum,                 /* only for prime ideals */
+e: Integers(),                 /* only for prime ideals */
+f: Integers(),                 /* only for prime ideals */
+exponent: RngIntElt,           /* only for prime ideals */
+LocalGenerator: FldNumElt,     /* only for prime ideals */
+LogLG: ModTupRngElt,           /* only for prime ideals */
+CrossValues: SeqEnum,          /* only for prime ideals */
+Phiadic: List,                 /* only for prime ideals */
+sfl: SeqEnum,                  /* only for prime ideals */
+LastLevelNeedsUpdate: BoolElt  /* only for prime ideals */
 >;
 
 TypeLevel:=recformat<
@@ -586,6 +587,7 @@ omrep`Type[r]`slope:=slope;
 omrep`Type[r]`h:=Integers()!slope;
 omrep`Phiadic[1]:=Phiadic[1];
 omrep`Phiadic[2]:=Phiadic[2];
+omrep`LastLevelNeedsUpdate := false;
 if Lastpsi then
     psi:=0;
     ResidualPolynomial(r,~omrep`Type,omrep`IntegerGenerator,~dev,~psi);
@@ -1461,6 +1463,9 @@ If the option RED is set to true, compute also the class of alpha in P^v/P^(v+1)
 require IsPrimeIdeal(P): "Second argument should be a prime ideal";
 require alpha in P`Parent: "Arguments should lie on the same number field";
 
+// Will only update if necessary.
+UpdateLastLevel(~P, P`Type[#P`Type]`Phi);
+
 Fp:=PrimeField(P`Type[1]`Fq);
 reduction:=Fp!0;
 if alpha eq 0 then 
@@ -1679,6 +1684,7 @@ for i in [2..#path-1] do
 //print "nova h", i, testh(P`Type,phi,Pol);
 end for;
 P`Type[ord]`Phi:=PolynomialRing(Integers())!phi;
+P`LastLevelNeedsUpdate := true;
 if UPD then
     P`sfl[3]:=Max([h,path[#path-1]]);
     P`Phiadic[4]:=x0num;
@@ -1843,6 +1849,10 @@ intrinsic UpdateLastLevel(~P,Pol)
 Also, it updates P`Phiadic[1]=a0 and P`Phiadic[2]=a1.
 }
 
+if not assigned P`LastLevelNeedsUpdate or P`LastLevelNeedsUpdate eq false then
+    return;
+end if;
+
 r:=#P`Type;
 qq,a0:=Quotrem(Pol,P`Type[r]`Phi);
 if a0 eq 0 then 
@@ -1861,6 +1871,7 @@ else
     P`Type[r]`psi:=psi/LeadingCoefficient(psi);
     P`Type[r]`logGamma:=P`Type[r]`logPhi-P`Type[r]`h*P`Type[r]`logPi;
 end if;
+P`LastLevelNeedsUpdate := false;
 end intrinsic;
 
 /////////////////////////////////////////////////////////////////////////////////////
