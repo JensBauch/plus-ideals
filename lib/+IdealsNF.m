@@ -1920,7 +1920,14 @@ else
 	minheight+:=step;
 	k+:=1;
     end while;
-    Append(~devs,[firstabscissa,Integers()!(val-firstabscissa*type[im1]`slope)]);
+    if firstabscissa ne 0 then
+        // This is necessary, because slope may be infinity and Magma doesn't
+        // like 0 * Inf.
+        devpart := val - firstabscissa * type[im1]`slope;
+    else
+        devpart := val;
+    end if;
+    Append(~devs,[firstabscissa,Integers()!devpart]);
     val:=Integers()!(type[im1]`e*val);
 end if;
 end intrinsic;
@@ -3036,13 +3043,10 @@ intrinsic reduceIdeal(I::Rec, p::RngIntElt : exponents:=false)-> Rec, RngIntElt
         Expos:=[Expos[ll]-Primes[ll]`e*a:ll in [1..s]];
     end if;
 
-    J := &*[ I`Parent`PrimeIdeals[p,i]^Expos[i] : i in [1..s] ];
-    print I;
-    print J;
-
     if exponents eq true then
         return Expos, a;
     else
+        J := &*[ I`Parent`PrimeIdeals[p,i]^Expos[i] : i in [1..s] ];
         return J, a;
     end if;
 end intrinsic; // reduceIdeal
@@ -3292,7 +3296,7 @@ intrinsic MaxMin(K::FldNum, p::RngIntElt, exponents)-> SeqEnum, SeqEnum, SeqEnum
     basis := basis[1..#basis-1];
     den_exp := den_exp[1..#den_exp-1];
 
-    //reducepBasis(~basis, den_exp, modifiers, p);
+    reducepBasis(~basis, den_exp, modifiers, p);
 
     den_exp := [ Floor(v) : v in den_exp ];
 
