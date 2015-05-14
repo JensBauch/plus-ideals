@@ -15,10 +15,6 @@ function testRandomIdeal(g, p, pol_name, params)
     printf "[MaxMin ideals] g = %o(%o), p = %o for ideal I = %o.\n", pol_name, params, p, I`FactorizationString;
 
     nums, dexp := pBasis(I, p : Separated:=true);
-    for i in [1..#K`PrimeIdeals[p]] do
-        UpdateLastLevel(~K`PrimeIdeals[p,i],
-                        K`PrimeIdeals[p,i]`Type[#K`PrimeIdeals[p,i]`Type]`Phi);
-    end for;
 
     norm := &+[ K`PrimeIdeals[p,i]`f * exponents[i] : i in [1..#exponents] ];
     if norm ne K`LocalIndex[p] - &+(dexp) then
@@ -29,11 +25,9 @@ function testRandomIdeal(g, p, pol_name, params)
     for i in [1..#nums] do
         alpha := K![ Coefficient(nums[i], j) : j in [0..Degree(g)-1] ];
         nu := dexp[i];
-        //printf "g_%o = %o.\n", i-1, nums[i]; 
         for j in [1..#K`PrimeIdeals[p]] do
             omrep := K`PrimeIdeals[p,j];
             val := PValuation(alpha, omrep);
-            //printf "v_P_%o(g_%o) = %o <=> %o * %o + %o.\n", j, i-1, val, nu, omrep`e, exponents[j];
             if val lt (nu * omrep`e) + exponents[j] then
                 printf "[MaxMin] Error: g_%o(theta) is not integral for omreps[%o]!\n", i-1, omrep`Position;
                 return false;
@@ -131,6 +125,6 @@ function testE(num_tests)
 end function;
 
 
-success := testB(5);
-quit;
+success := testE(5);
+
 
